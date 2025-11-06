@@ -1,0 +1,5 @@
+#!/bin/sh
+
+[ "$1" = "" ] && exit
+
+echo "$1" | sed -e 's/0x//g' -e 's/0X//g' -e 's/\\x//g' -e 's/,//g' -e 's/00/??/g'
