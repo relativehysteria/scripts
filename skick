@@ -1,10 +1,69 @@
 #!/usr/bin/env python
 
+from __future__ import annotations
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
 from requests import get
 
+class Concert:
+    def __init__(self, band: str, date: str, location: str, venue: str):
+        self.band     = band
+        self.date     = date
+        self.location = location
+        self.venue    = venue
+
+    @staticmethod
+    def get_soup(url: str) -> Optional[BeautifulSoup]:
+        hdrs = { "User-Agent": "Mozilla/5.0" }
+        r = get(url, headers=hdrs)
+
+        if not r.ok:
+            return None
+
+        return BeautifulSoup(r.text, features="lxml")
+
+
+    @staticmethod
+    def get_nearest(soup: BeautifulSoup) -> Optional[str]:
+        # Bail out if the band is not touring
+        if soup.find("div", class_="off-tour-button") is not None:
+            return
+
+        # Get the nearest concert link
+        nearest = soup.find("a", class_="see-nearest-concert-link")["href"]
+
+        # Get and return the soup for this concert
+        return Concert.get_soup(f"https://www.songkick.com/{nearest}")
+
+
+    @staticmethod
+    def from_artist_code(code: str) -> Optional[Concert]:
+        # Get the calendar page
+        url = f"https://www.songkick.com/artists/{code}/calendar"
+        soup = Concert.get_soup(url)
+
+        # Ignore the artist if the request failed
+        if soup is None:
+            return
+
+        # Get the nearest concert
+        nearest = Concert.get_nearest(soup)
+
+        # Again, ignore on failure
+        if nearest is None:
+            return
+
+        # Get the name
+        name = soup.find("h1", class_="title-copy").text.split(" tour date")[-2]
+
+        # Get the concert date, location and venue
+        loc_txt  = nearest.find_all("span", class_="venue-text")
+        date     = nearest.find("div", class_="event-date").text.strip()
+        venue    = loc_txt[0].text.strip()
+        location = loc_txt[1].find_all("span")[-1].text.strip()
+
+        return Concert(name, date, location, venue)
 
 ARTISTS = [
     "3768296-rum-jungle",
@@ -43,55 +102,10 @@ ARTISTS = [
     "10234682-new-eves",
 ]
 
-def get_soup(url: str) -> Optional[BeautifulSoup]:
-    hdrs = { "User-Agent": "Mozilla/5.0" }
-    r = get(url, headers=hdrs)
+if __name__ == "__main__":
+    pool = ThreadPoolExecutor(max_workers=len(ARTISTS))
 
-    if not r.ok:
-        return None
-
-    return BeautifulSoup(r.text, features="lxml")
-
-
-def get_nearest(soup: BeautifulSoup) -> Optional[str]:
-    # Bail out if the band is not touring
-    if soup.find("div", class_="off-tour-button") is not None:
-        return
-
-    # Get the nearest concert link
-    nearest = soup.find("a", class_="see-nearest-concert-link")["href"]
-
-    # Get and return the soup for this concert
-    return get_soup(f"https://www.songkick.com/{nearest}")
-
-
-def scrape(artist_path: str) -> Optional[str]:
-    # Get the calendar page
-    soup = get_soup(f"https://www.songkick.com/artists/{artist_path}/calendar")
-
-    # Ignore the artist if the request failed
-    if soup is None:
-        return
-
-    # Get the nearest concert
-    nearest = get_nearest(soup)
-
-    # Again, ignore on failure
-    if nearest is None:
-        return
-
-    # Get the band name, concert date, location and venue
-    loc_txt  = nearest.find_all("span", class_="venue-text")
-    name     = soup.find("h1", class_="title-copy").text.split(" tour date")[-2]
-    date     = nearest.find("div", class_="event-date").text.strip()
-    venue    = loc_txt[0].text.strip()
-    location = loc_txt[1].find_all("span")[-1].text.strip()
-
-    return f"{name}\n ├ {location} ┊ {venue}\n └ {date}"
-
-pool = ThreadPoolExecutor(max_workers=len(ARTISTS))
-
-for artist in pool.map(scrape, ARTISTS):
-    if artist is None:
-        continue
-    print(artist)
+    for artist in pool.map(Concert.from_artist_code, ARTISTS):
+        if artist is None:
+            continue
+        print(artist)
