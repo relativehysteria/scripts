@@ -8,7 +8,10 @@ from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
 from requests import get
 
-ARTISTS = [
+# Concerts in the following locations will be printed in bold
+PREFERRED_LOCATIONS = { "Austria", "Czech Republic", "Slovakia" }
+
+ARTISTS = {
     "3768296-rum-jungle",
     "590705-bon-iver",
     "4126816-wolf-alice",
@@ -43,7 +46,7 @@ ARTISTS = [
     "464566-do-make-say-think",
     "9377124-sorry",
     "10234682-new-eves",
-]
+}
 
 BASE_URL = "https://www.songkick.com"
 
@@ -104,6 +107,9 @@ class Concert:
         return cls(name, date, venue, location)
 
 if __name__ == "__main__":
+    # Make the preferred locations lowercase
+    preferred = tuple(i.lower() for i in PREFERRED_LOCATIONS)
+
     # Scrape everything in parallel
     pool = ThreadPoolExecutor(max_workers=len(ARTISTS))
     concerts = [i for i in pool.map(Concert.from_artist_code, ARTISTS)
@@ -114,14 +120,19 @@ if __name__ == "__main__":
 
     # ANSI colors
     RESET   = "\033[0m"
-    BOLD    = "\033[1m"
     CYAN    = "\033[36m"
+    RED     = "\033[31m"
     YELLOW  = "\033[33m"
     MAGENTA = "\033[35m"
-    GREEN   = "\033[32m"
 
-    # Print them out
+    end = f" {YELLOW}┆ "
+
+    # Print the concerts out
     for c in concerts:
-        print(f"{RESET}{c.band}")
-        print(f" {YELLOW}├ {MAGENTA}{c.location}{RESET}, {CYAN}{c.venue}")
-        print(f" {YELLOW}└ {GREEN}{c.date.isoformat()}")
+        x = f"{RED}" if c.location.lower().endswith(preferred) else f"{YELLOW}"
+        print(f"{x}{c.date.isoformat()}{RESET}", end=end)
+        print(f"{RESET}{c.band}", end=end)
+        print(f"{MAGENTA}{c.location}", end=end)
+        print(f"{CYAN}{c.venue}")
+
+    print(f"{RESET}", end='')
