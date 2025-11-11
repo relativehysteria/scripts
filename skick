@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
 from __future__ import annotations
+from dataclasses import dataclass
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date
 from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
 from requests import get
@@ -44,49 +45,47 @@ ARTISTS = [
     "10234682-new-eves",
 ]
 
+BASE_URL = "https://www.songkick.com"
+
+@dataclass
 class Concert:
-    def __init__(self, band: str, date: str, location: str, venue: str):
-        self.band     = band
-        self.date     = datetime.strptime(date, "%A %d %B %Y").date()
-        self.location = location
-        self.venue    = venue
+    band: str
+    date: date
+    venue: str
+    location: str
 
     @staticmethod
-    def get_soup(url: str) -> Optional[BeautifulSoup]:
-        hdrs = { "User-Agent": "Mozilla/5.0" }
-        r = get(url, headers=hdrs)
-
-        if not r.ok:
+    def _get_soup(url: str) -> Optional[BeautifulSoup]:
+        try:
+            r = get(url, headers={ "User-Agent": "Mozilla/5.0" })
+            r.raise_for_status()
+            return BeautifulSoup(r.text, features="lxml")
+        except:
             return None
 
-        return BeautifulSoup(r.text, features="lxml")
-
-    @staticmethod
-    def get_nearest(soup: BeautifulSoup) -> Optional[str]:
+    @classmethod
+    def get_nearest(cls, soup: BeautifulSoup) -> Optional[str]:
         # Bail out if the band is not touring
         if soup.find("div", class_="off-tour-button") is not None:
-            return
+            return None
 
         # Get the nearest concert link
-        nearest = soup.find("a", class_="see-nearest-concert-link")["href"]
+        nearest = soup.find("a", class_="see-nearest-concert-link")
+        if not nearest or not nearest.get("href"):
+            return None
 
         # Get and return the soup for this concert
-        return Concert.get_soup(f"https://www.songkick.com/{nearest}")
+        return cls._get_soup(f"{BASE_URL}/{nearest['href']}")
 
-    @staticmethod
-    def from_artist_code(code: str) -> Optional[Concert]:
+    @classmethod
+    def from_artist_code(cls, code: str) -> Optional[Concert]:
         # Get the calendar page
-        url = f"https://www.songkick.com/artists/{code}/calendar"
-        soup = Concert.get_soup(url)
-
-        # Ignore the artist if the request failed
+        soup = cls._get_soup(f"{BASE_URL}/artists/{code}/calendar")
         if soup is None:
             return
 
         # Get the nearest concert
         nearest = Concert.get_nearest(soup)
-
-        # Again, ignore on failure
         if nearest is None:
             return
 
@@ -99,7 +98,10 @@ class Concert:
         venue    = loc_txt[0].text.strip()
         location = loc_txt[1].find_all("span")[-1].text.strip()
 
-        return Concert(name, date, location, venue)
+        # Parse the date as a date object
+        date = datetime.strptime(date, "%A %d %B %Y").date()
+
+        return cls(name, date, venue, location)
 
 if __name__ == "__main__":
     # Scrape everything in parallel
@@ -120,6 +122,6 @@ if __name__ == "__main__":
 
     # Print them out
     for c in concerts:
-        print(f"{BOLD}{YELLOW}{c.band}{RESET}")
-        print(f" ├ {MAGENTA}{c.location}{RESET}, {CYAN}{c.venue}{RESET}")
-        print(f" └ {GREEN}{c.date.isoformat()}{RESET}")
+        print(f"{RESET}{c.band}")
+        print(f" {YELLOW}├ {MAGENTA}{c.location}{RESET}, {CYAN}{c.venue}")
+        print(f" {YELLOW}└ {GREEN}{c.date.isoformat()}")
