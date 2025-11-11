@@ -1,10 +1,9 @@
 #!/bin/sh
 
-temp=$(mktemp -d)
-pushd "$temp"
+pushd "$(mktemp -d)"
+
 wget 'https://discord.com/api/download?platform=linux&format=tar.gz'
 tar -xvf 'download?platform=linux&format=tar.gz'
+
 mv ./Discord/Discord ./Discord/discord
-rm -rf "$HOME"/.config/discord
-mv ./Discord "$HOME"/.config/discord
-popd
+mv ./Discord/* "$HOME"/.config/discord/
