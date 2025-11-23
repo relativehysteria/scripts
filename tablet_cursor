@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Pick input device
+input=$(swaymsg -t get_inputs | jq -r '.[].identifier' | wmenu)
+[ -z "$input" ] && exit
+
+# Pick output device, sorted by position (rect.x, then rect.y)
+output=$(
+    swaymsg -t get_outputs \
+    | jq -r '.[] | {name, x: .rect.x, y: .rect.y} | @base64' \
+    | while read -r l; do
+          echo "$l" | base64 --decode | jq -r '[.x, .y, .name] | @tsv'
+      done \
+    | sort -n -k1,1 -k2,2 \
+    | awk '{print $3}' \
+    | wmenu
+)
+[ -z "$output" ] && exit
+
+# Lock the cursor to the selected screen
+swaymsg input "$input" map_to_output "$output"
