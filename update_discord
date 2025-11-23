@@ -5,5 +5,6 @@ pushd "$(mktemp -d)"
 wget 'https://discord.com/api/download?platform=linux&format=tar.gz'
 tar -xvf 'download?platform=linux&format=tar.gz'
 
+rm -rf "$HOME"/.config/discord/resources
 mv ./Discord/Discord ./Discord/discord
 mv ./Discord/* "$HOME"/.config/discord/
