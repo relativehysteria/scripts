@@ -15,10 +15,16 @@ pactl get-default-source | grep -q "soundboard" && SOURCE="$DEFAULT_MIC"
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 SOUND_EFFECT="$SCRIPT_DIR/../mic_check.mp3"
 
+# Get current volume (any channel, numeric only)
+VOLUME=$(pactl get-source-volume "$SOURCE" \
+    | awk '/Volume:/ {gsub("%","",$5); print $5; exit}')
+
 # Toggle mic; play sound effect on unmute
-if pactl get-source-volume @DEFAULT_SOURCE@ | grep -q '100%'; then
-    pactl set-source-volume "$SOURCE" '0%'
+if [ "$VOLUME" -gt 0 ]; then
+    # Mic is ON -> mute
+    pactl set-source-volume "$SOURCE" "0%"
 else
-    setsid mpv "$SOUND_EFFECT" --volume=130
-    pactl set-source-volume "$SOURCE" '100%'
+    # Mic is OFF -> play sound effect and unmute the mic
+    setsid mpv "$SOUND_EFFECT" --volume=130 >/dev/null 2>&1 &
+    pactl set-source-volume "$SOURCE" "100%"
 fi
