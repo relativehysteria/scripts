@@ -8,3 +8,7 @@ tar -xvf 'download?platform=linux&format=tar.gz'
 rm -rf "$HOME"/.config/discord/resources
 mv ./Discord/Discord ./Discord/discord
 mv ./Discord/* "$HOME"/.config/discord/
+
+if ! [ -f ".local/bin/discord" ]; then
+    ln -sf "$HOME"/.config/discord "$HOME"/.local/bin/discord
+fi
