@@ -1,8 +1,14 @@
 #!/bin/sh
 
+if ! groups | grep rustusers &>/dev/null; then
+    echo "You're not part of the 'rustusers' group!"
+    exit 1
+fi
+
 install_crates() {
-    cargo install --locked tokei cargo-info fd tokio-console cargo-expand rg
+    cargo install --locked tokei cargo-info fd tokio-console cargo-expand ripgrep
 }
+
 
 RUST_DIR="/opt/rust"
 if [ -d "$RUST_DIR/cargo" ]; then
@@ -24,6 +30,4 @@ else
     # Install the crates
     source "$RUST_DIR/cargo/env"
     install_crates
-
-    echo "Your current PATH hasn't been changed."
 fi
