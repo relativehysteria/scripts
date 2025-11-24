@@ -24,7 +24,7 @@ else
     sudo chmod g+s "$RUST_DIR"
 
     # Download and execute rustup
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    curl --proto '=https' --tlsv1.2 -sSf 'https://sh.rustup.rs' \
         | sh -s -- -y --no-modify-path --default-toolchain nightly
 
     # Install the crates

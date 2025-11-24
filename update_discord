@@ -5,11 +5,10 @@ pushd "$(mktemp -d)"
 wget 'https://discord.com/api/download?platform=linux&format=tar.gz'
 tar -xvf 'download?platform=linux&format=tar.gz'
 
-mkdir -p  "$HOME"/.config/discord
-rm -rf "$HOME"/.config/discord/resources
-mv ./Discord/Discord ./Discord/discord
-mv ./Discord/* "$HOME"/.config/discord/
+mkdir -p  "$HOME/.config/discord"
+mv "./Discord/Discord" "./Discord/discord"
+cp -a "./Discord/." "$HOME/.config/discord/"
 
 if ! [ -f ".local/bin/discord" ]; then
-    ln -sf "$HOME"/.config/discord "$HOME"/.local/bin/discord
+    ln -sf "$HOME/.config/discord/discord" "$HOME/.local/bin/discord"
 fi
