@@ -1,4 +1,29 @@
 #!/bin/sh
 
-rustup update
-cargo install --locked tokei cargo-info fd tokio-console cargo-expand rg
+install_crates() {
+    cargo install --locked tokei cargo-info fd tokio-console cargo-expand rg
+}
+
+RUST_DIR="/opt/rust"
+if [ -d "$RUST_DIR/cargo" ]; then
+    rustup update
+    install_crates
+else
+    echo "Installing rust!"
+
+    # Create the rust directory
+    sudo mkdir -p "$RUST_DIR"
+    sudo chown :rustusers "$RUST_DIR"
+    sudo chmod 770 "$RUST_DIR"
+    sudo chmod g+s "$RUST_DIR"
+
+    # Download and execute rustup
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --no-modify-path --default-toolchain nightly
+
+    # Install the crates
+    source "$RUST_DIR/cargo/env"
+    install_crates
+
+    echo "Your current PATH hasn't been changed."
+fi
