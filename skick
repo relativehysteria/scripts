@@ -102,7 +102,9 @@ class Concert:
         venue    = loc_txt[0].text.strip()
         location = loc_txt[1].find_all("span")[-1].text.strip()
 
-        # Parse the date as a date object
+        # For multiday festivals, use the start of the festival as the date and
+        # parse it as a date object
+        date = date.split(' – ')[0]
         date = datetime.strptime(date, "%A %d %B %Y").date()
 
         return cls(name, date, venue, location)
