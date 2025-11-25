@@ -1,0 +1,101 @@
+#!/bin/sh
+
+# Preferred locations in order of priority
+PREFERRED='["czech","austria","slovak","germany"]'
+
+ARTISTS="\
+    15561982-westside-cowboy \
+    15555135-geordie-greep \
+    438-modest-mouse \
+    1525-sufjan-stevens \
+    3452-sunny-day-real-estate \
+    8608-hum \
+    170100-pygmy-lush \
+    75742-toe \
+    16338-balthazar \
+    25873-sigur-ros \
+    821748-shakey-graves \
+    207551-olafur-arnalds \
+    201130-warpaint \
+    50358-jose-gonzalez \
+    14816-fleet-foxes \
+    788-iron-and-wine \
+    7222297-rainbow-kitten-surprise \
+    548820-momma \
+    15488131-black-country-new-road \
+    13589067-black-midi \
+    3690124-rum-jungle \
+    144274-bon-iver \
+    1927776-wolf-alice \
+    14167026-queen's-pleasure \
+    1269886-jeff-rosenstock \
+    2075156-tamino \
+    284481-tom-rosenthal \
+    4384968-ichiko-aoba \
+    15494437-enumclaw-(band) \
+    15551960-racing-mount-pleasant \
+    8888653-haley-heynderickx \
+    310307-mouse-on-the-keys \
+    173191-sorry \
+    15531111-the-new-eves \
+    103929-the-kilimanjaro-darkjazz-ensemble"
+
+# Temporary file to store results
+TMPFILE=$(mktemp)
+
+# The agent to use when downloading stuff
+AGENT='Mozilla/5.0 Gecko/20100101 Firefox/145.0'
+
+# Fetch information about a single gig
+fetch_gig() {
+    local artist_id="$1"
+    local gig=$(curl "https://www.bandsintown.com/a/$1" -A "$AGENT" --silent \
+        | grep 'window.__data=' \
+        | sed 's/^\s*<script>window.__data=//; s/<\/script>$//' \
+        | jq -r --argjson prefs "$PREFERRED" '
+            .artistView.body.events.upcomingEvents.events
+            | map(select(.location | test($prefs | join("|"); "i")))
+            | sort_by(
+                (.location | ascii_downcase) as $loc
+                | ($prefs
+                    | map(ascii_downcase)
+                    | map(
+                        if $loc | test(. ; "i") then . else null end
+                      )
+                    | map(index(.) // 999)
+                    | map(select(. != null))
+                    | if length > 0 then .[0] else 999 end
+                  )
+              )
+            | .[0]
+            | select(.)')
+
+    if [ -n "$gig" ]; then
+        echo "$gig" >> "$TMPFILE"
+    fi
+}
+
+# Run all requests in parallel
+for artist in $ARTISTS; do
+    fetch_gig "$artist" &
+done
+
+# Wait for them to finish
+wait
+
+RESET=$'\033[0m'
+CYAN=$'\033[36m'
+RED=$'\033[31m'
+YELLOW=$'\033[33m'
+MAGENTA=$'\033[35m'
+SEP="$YELLOW┆$RESET"
+
+# Combine and sort by date
+jq -s '.' "$TMPFILE" | jq -c 'sort_by(.startsAt)[]' | while read -r gig; do
+    artist=$(echo "$gig" | jq -r '.ticketClickData.userCreationData.artistName')
+    start_time=$(echo "$gig" | jq -r '.startsAt' | sed 's/T/ /')
+    location=$(echo "$gig" | jq -r '.location')
+    venue=$(echo "$gig" | jq -r '.venueName')
+
+    echo "$YELLOW$start_time $SEP $artist $SEP $MAGENTA$location$RESET $SEP $CYAN$venue$RESET"
+done

@@ -8,8 +8,10 @@ from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
 from requests import get
 
+print("This script has been obsoleted by the `bandsintown` script.")
+
 # Concerts in the following locations will be printed in different color
-PREFERRED_LOCATIONS = { "Austria", "Czech Republic", "Slovakia" }
+PREFERRED_LOCATIONS = { "Austria", "Czech Republic", "Slovakia", "Germany" }
 
 ARTISTS = {
     "3768296-rum-jungle",
