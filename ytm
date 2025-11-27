@@ -8,7 +8,7 @@ json=$(yt-dlp -j --no-playlist "$url")
 artist=$(echo "$json" | jq -r '.artist')
 title=$(echo "$json" | jq -r '.title')
 
-if [ "$artist" = "null" ]; then
+if [ "$artist" = "null" ] || [ -z "$artist" ] || [ -z "$title" ]; then
     echo "Can't extract info"
     exit 1
 fi

@@ -4,6 +4,8 @@
 PREFERRED='["czech","austria","slovak","germany"]'
 
 ARTISTS="\
+    25874-radiohead \
+    26092-thom-yorke \
     15561982-westside-cowboy \
     15555135-geordie-greep \
     438-modest-mouse \
@@ -15,6 +17,7 @@ ARTISTS="\
     16338-balthazar \
     25873-sigur-ros \
     821748-shakey-graves \
+    2591154-ratboys \
     207551-olafur-arnalds \
     201130-warpaint \
     50358-jose-gonzalez \
