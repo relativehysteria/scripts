@@ -6,7 +6,8 @@ if ! groups | grep rustusers &>/dev/null; then
 fi
 
 install_crates() {
-    cargo install --locked tokei cargo-info fd tokio-console cargo-expand ripgrep
+    cargo install --locked tokei cargo-info tokio-console cargo-expand ripgrep \
+        cargo-show-asm
 }
 
 
