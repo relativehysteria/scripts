@@ -1,0 +1,44 @@
+#!/bin/sh
+
+# Check if a package name is provided
+if [ -z "$1" ]; then
+    echo "Usage: $0 <package>"
+    exit 1
+fi
+
+pkg="$1"
+dir=$(mktemp -d)
+
+# Check if temporary directory was created
+if [ ! -d "$dir" ]; then
+    echo "Failed to create temporary directory."
+    exit 1
+fi
+
+echo "Building '$pkg' in '$dir'"
+cd "$dir" || exit
+
+# Download the PKGBUILD
+echo "Downloading PKGBUILD for '$pkg'..."
+curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=$pkg" -o PKGBUILD
+
+# Check if the PKGBUILD was downloaded successfully
+if [ ! -f PKGBUILD ]; then
+    echo "Failed to download PKGBUILD. Please check the package name or your internet connection."
+    exit 1
+fi
+
+# Optionally: Let the user review the PKGBUILD before proceeding
+echo "PKGBUILD downloaded. You can review the file before proceeding."
+echo "Press [Enter] to continue, or [Ctrl+C] to cancel."
+read -r
+
+# Build the package
+echo "Building the package..."
+makepkg -si || { echo "Build failed."; exit 1; }
+
+# Clean up
+echo "Cleaning up temporary files..."
+rm -rf "$dir"
+
+echo "Package '$pkg' built and installed successfully!"
