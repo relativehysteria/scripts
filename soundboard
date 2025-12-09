@@ -93,6 +93,11 @@ start_mixer() {
 
     [ -n "$SINK_INPUT_ID" ] && p set-sink-input-volume "$SINK_INPUT_ID" "80%"
 
+    VIRTUAL_MIC_ID=$(p load-module module-remap-source \
+        master="$MIX_SINK.monitor" \
+        source_name="${SOUNDBOARD_SINK}_mic" \
+        source_properties=device.description="SOUNDBOARD")
+
     # Save state
     {
         echo "# auto-generated"
@@ -102,13 +107,13 @@ start_mixer() {
         echo "LB_SBD_TO_MIX=$LB_SBD_TO_MIX"
         echo "LB_SBD_TO_SYS=$LB_SBD_TO_SYS"
         echo "DEFAULT_MIC_SRC=$DEFAULT_MIC_SRC"
+        echo "VIRTUAL_MIC_ID=$VIRTUAL_MIC_ID"
     } > "$STATE_FILE"
 
-    # Apply virtual mic
-    p set-default-source "$MIX_SINK.monitor"
+    p set-default-source "${SOUNDBOARD_SINK}_mic"
 
     echo "Soundboard mixer started."
-    echo "Now using virtual mic: $MIX_SINK.monitor"
+    echo "Now using virtual mic: ${SOUNDBOARD_SINK}_mic"
     echo "Play audio to: pulse/$SOUNDBOARD_SINK"
 }
 
@@ -130,6 +135,7 @@ stop_mixer() {
     pactl unload-module "$LB_MIC_TO_MIX" >/dev/null 2>&1 || true
     pactl unload-module "$MIX_SINK_ID"   >/dev/null 2>&1 || true
     pactl unload-module "$SOUNDBOARD_SINK_ID" >/dev/null 2>&1 || true
+    pactl unload-module "$VIRTUAL_MIC_ID" >/dev/null 2>&1 || true
 
     # Restore original mic
     if [ -n "${DEFAULT_MIC_SRC:-}" ]; then
