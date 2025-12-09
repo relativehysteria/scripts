@@ -1,6 +1,5 @@
 #!/bin/sh
 
-# exit on error or undefined variable
 set -eu
 
 SOUNDBOARD_SINK="soundboard"
@@ -8,7 +7,7 @@ MIX_SINK="${SOUNDBOARD_SINK}_mix"
 SOUNDBOARD_DEVICE="pulse/${SOUNDBOARD_SINK}"
 STATE_FILE="/tmp/soundboard_mic"
 
-# Helper to run pactl safely
+# helper to run pactl safely
 p() {
     if ! pactl "$@"; then
         echo "Error running: pactl $*" >&2
@@ -16,8 +15,7 @@ p() {
     fi
 }
 
-
-# Helper to check that pactl exists and we are able to use it
+# helper to check that pactl exists and we are able to use it
 check_system_compatibility() {
     command -v pactl >/dev/null 2>&1 || {
         echo "Error: pactl not found." >&2
@@ -30,8 +28,7 @@ check_system_compatibility() {
     }
 }
 
-
-# Let the user select a microphone
+# let the user select a microphone
 pick_microphone() {
     mics=$(pactl list short sources | awk '!/monitor/ {print $2}')
     [ -z "$mics" ] && {
@@ -39,30 +36,57 @@ pick_microphone() {
         exit 1
     }
 
-    # If only one mic exists, auto-select it
+    # if onlye one exists, auto-select it
     count=$(printf "%s\n" "$mics" | wc -l)
     if [ "$count" -eq 1 ]; then
         printf "%s" "$mics"
         return
     fi
-
     chosen=$(printf "%s\n" "$mics" | wmenu)
     [ -z "$chosen" ] && exit 1
     printf "%s" "$chosen"
 }
 
+################################################################################
+### FLAG HANDLING ##############################################################
+################################################################################
 
-# Toggle on the mixer
+DISABLE_MIC=false
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --disable-mic)
+            DISABLE_MIC=true
+            ;;
+        --help|-h)
+            echo "Usage: $0 [--disable-mic]"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+################################################################################
+### START MIXER ###############################################################
+################################################################################
+
+# toggle on the mixer
 start_mixer() {
     echo "Starting soundboard mixer…"
 
     DEFAULT_SINK=$(pactl get-default-sink)
     DEFAULT_MIC_SRC=$(pactl get-default-source)
 
-    # Let user choose a mic if multiple exist
-    MIC_SOURCE=$(pick_microphone)
+    # let the user choose a mic if multiple exist
+    if [ "$DISABLE_MIC" = false ]; then
+        MIC_SOURCE=$(pick_microphone)
+    fi
 
-    # Load sinks
+    # load sinks
     SOUNDBOARD_SINK_ID=$(p load-module module-null-sink \
         sink_name="$SOUNDBOARD_SINK" \
         sink_properties=device.description="Soundboard File Input" \
@@ -73,10 +97,14 @@ start_mixer() {
         sink_properties=device.description="Soundboard Mic" \
         | tr -d '\n')
 
-    # Create loopbacks
-    LB_MIC_TO_MIX=$(p load-module module-loopback \
-        source="$MIC_SOURCE" \
-        sink="$MIX_SINK" latency_msec=50 | tr -d '\n')
+    # create loopbacks
+    if [ "$DISABLE_MIC" = false ]; then
+        LB_MIC_TO_MIX=$(p load-module module-loopback \
+            source="$MIC_SOURCE" \
+            sink="$MIX_SINK" latency_msec=50 | tr -d '\n')
+    else
+        LB_MIC_TO_MIX=""
+    fi
 
     LB_SBD_TO_MIX=$(p load-module module-loopback \
         source="$SOUNDBOARD_SINK.monitor" \
@@ -86,7 +114,7 @@ start_mixer() {
         source="$SOUNDBOARD_SINK.monitor" \
         sink="$DEFAULT_SINK" latency_msec=50 | tr -d '\n')
 
-    # Lower volume of soundboard -> speakers loopback
+    # lowe the volume of soundboard -> speakers loopback
     SINK_INPUT_ID=$(pactl list sink-inputs \
         | grep -i -B 2 "owner module: $LB_SBD_TO_SYS" \
         | head -1 \
@@ -99,7 +127,6 @@ start_mixer() {
         source_name="${SOUNDBOARD_SINK}_mic" \
         source_properties=device.description="SOUNDBOARD")
 
-    # Save state
     {
         echo "# auto-generated"
         echo "SOUNDBOARD_SINK_ID=$SOUNDBOARD_SINK_ID"
@@ -115,12 +142,12 @@ start_mixer() {
     p set-default-source "${SOUNDBOARD_SINK}_mic"
 
     echo "Soundboard mixer started."
-    echo "Now using virtual mic: ${SOUNDBOARD_SINK}_mic"
-    echo "Play audio to: $SOUNDBOARD_DEVICE"
+    echo "Virtual mic active: ${SOUNDBOARD_SINK}_mic"
+    echo "Play audio to $SOUNDBOARD_DEVICE"
 }
 
+################################################################################
 
-# Toggle off the mixer
 stop_mixer() {
     [ ! -f "$STATE_FILE" ] && {
         echo "Nothing to stop."
@@ -128,25 +155,21 @@ stop_mixer() {
     }
 
     echo "Stopping soundboard mixer…"
-
     . "$STATE_FILE"
 
-    # Unload modules (ignore errors)
     pactl unload-module "$LB_SBD_TO_SYS"  >/dev/null 2>&1 || true
-    pactl unload-module "$LB_SBD_TO_MIX" >/dev/null 2>&1 || true
-    pactl unload-module "$LB_MIC_TO_MIX" >/dev/null 2>&1 || true
-    pactl unload-module "$MIX_SINK_ID"   >/dev/null 2>&1 || true
+    pactl unload-module "$LB_SBD_TO_MIX"  >/dev/null 2>&1 || true
+    [ -n "$LB_MIC_TO_MIX" ] && pactl unload-module "$LB_MIC_TO_MIX" >/dev/null 2>&1 || true
+    pactl unload-module "$MIX_SINK_ID"    >/dev/null 2>&1 || true
     pactl unload-module "$SOUNDBOARD_SINK_ID" >/dev/null 2>&1 || true
     pactl unload-module "$VIRTUAL_MIC_ID" >/dev/null 2>&1 || true
 
-    # Restore original mic
     if [ -n "${DEFAULT_MIC_SRC:-}" ]; then
         pactl set-default-source "$DEFAULT_MIC_SRC" >/dev/null 2>&1 || true
         echo "Restored default mic: $DEFAULT_MIC_SRC"
     fi
 
     rm -f "$STATE_FILE"
-
     echo "Soundboard mixer disabled."
 }
 
