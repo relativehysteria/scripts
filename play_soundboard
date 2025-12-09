@@ -3,13 +3,20 @@
 soundboard_dir="$HOME/.local/share/soundboard"
 state="/tmp/current_sound"
 
-file=$(ls "$soundboard_dir" | wmenu)
+if ! [ "$1" = "" ]; then
+    file="$1"
+else
+    file=$(ls "$soundboard_dir" | wmenu -i)
+fi
+
+[ "$file" = "" ] && exit
 
 # If there's a PID stored, and it's running, kill it
 if [ -f "$state" ]; then
     old_pid=$(cat "$state")
     if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
         kill "$old_pid"
+
         # optional: force kill after short delay
         sleep 0.1
         kill -9 "$old_pid" 2>/dev/null
@@ -18,8 +25,7 @@ fi
 
 
 # Start new mpv
-mpv --audio-device="pulse/soundboard" \
-    "$soundboard_dir/$file" &
+mpv --audio-device="pulse/soundboard" "$soundboard_dir/$file" &
 
 new_pid=$!
 echo "$new_pid" > "$state"
