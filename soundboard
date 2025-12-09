@@ -5,6 +5,7 @@ set -eu
 
 SOUNDBOARD_SINK="soundboard"
 MIX_SINK="${SOUNDBOARD_SINK}_mix"
+SOUNDBOARD_DEVICE="pulse/${SOUNDBOARD_SINK}"
 STATE_FILE="/tmp/soundboard_mic"
 
 # Helper to run pactl safely
@@ -108,13 +109,14 @@ start_mixer() {
         echo "LB_SBD_TO_SYS=$LB_SBD_TO_SYS"
         echo "DEFAULT_MIC_SRC=$DEFAULT_MIC_SRC"
         echo "VIRTUAL_MIC_ID=$VIRTUAL_MIC_ID"
+        echo "SOUNDBOARD_DEVICE=$SOUNDBOARD_DEVICE"
     } > "$STATE_FILE"
 
     p set-default-source "${SOUNDBOARD_SINK}_mic"
 
     echo "Soundboard mixer started."
     echo "Now using virtual mic: ${SOUNDBOARD_SINK}_mic"
-    echo "Play audio to: pulse/$SOUNDBOARD_SINK"
+    echo "Play audio to: $SOUNDBOARD_DEVICE"
 }
 
 

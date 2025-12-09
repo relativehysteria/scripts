@@ -1,15 +1,29 @@
 #!/bin/sh
 
+soundboard_dev=$(grep "SOUNDBOARD_DEVICE" /tmp/soundboard_mic  2>/dev/null | tr '=' ' ' | awk '{print $2}')
 soundboard_dir="$HOME/.local/share/soundboard"
 state="/tmp/current_sound"
 
+# Check that a soundboard is on
+[ "$soundboard_dev" = "" ] && echo "No soundboard." && exit
+
+# If we weren't given a file name, select one from the soundboard directory
 if ! [ "$1" = "" ]; then
     file="$1"
 else
     file=$(ls "$soundboard_dir" | wmenu -i)
 fi
 
+# If we have no filename, bail out
 [ "$file" = "" ] && exit
+
+# If the filename starts with "./", play the relatively-pathed file, else play a
+# file from the soundboard directory
+if [ "${file#./}" != "$file" ]; then
+    file="$PWD/$file"
+else
+    file="$soundboard_dir/$file"
+fi
 
 # If there's a PID stored, and it's running, kill it
 if [ -f "$state" ]; then
@@ -23,10 +37,8 @@ if [ -f "$state" ]; then
     fi
 fi
 
-
 # Start new mpv
-mpv --audio-device="pulse/soundboard" "$soundboard_dir/$file" &
-
+mpv --audio-device="pulse/soundboard" "$file" &
 new_pid=$!
 echo "$new_pid" > "$state"
 
