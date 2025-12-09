@@ -4,4 +4,4 @@ pasta_dir="$HOME/.local/share/pastas"
 
 file=$(ls "$pasta_dir" | wmenu)
 
-wl-copy $(cat "$file")
+cat "$pasta_dir/$file" | wl-copy
