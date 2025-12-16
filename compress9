@@ -19,8 +19,8 @@ if [ -z "$DURATION" ]; then
   exit 2
 fi
 
-# Convert 10 MB to bits
-TARGET_SIZE_BITS=$((10 * 1000 * 1000 * 8))
+# Convert ~9 MB to bits
+TARGET_SIZE_BITS=$((9 * 1000 * 1000 * 8))
 
 # Calculate total bitrate in bits per second
 BITRATE=$(echo "$TARGET_SIZE_BITS / $DURATION" | bc)
