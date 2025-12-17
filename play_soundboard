@@ -37,6 +37,9 @@ if [ -f "$state" ]; then
     fi
 fi
 
+# If the argument is "KILL", just kill and don't play anything
+[ "$1" = "KILL" ] && exit
+
 # Start new mpv
 mpv --audio-device="pulse/soundboard" "$file" &
 new_pid=$!
