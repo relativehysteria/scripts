@@ -1,14 +1,16 @@
 #!/bin/sh
 
-pushd "$(mktemp -d)"
+cd "$(mktemp -d)" || exit 1
 
-wget 'https://discord.com/api/download?platform=linux&format=tar.gz'
-tar -xvf 'download?platform=linux&format=tar.gz'
+wget -O "discord.tar.gz" 'https://discord.com/api/download?platform=linux&format=tar.gz'
+tar -xvf "discord.tar.gz"
+
+mv "./Discord/Discord" "./Discord/discord"
 
 mkdir -p  "$HOME/.config/discord"
-mv "./Discord/Discord" "./Discord/discord"
 cp -a "./Discord/." "$HOME/.config/discord/"
 
-if ! [ -f ".local/bin/discord" ]; then
+if ! [ -f "$HOME/.local/bin/discord" ]; then
+    mkdir -p "$HOME/.local/bin"
     ln -sf "$HOME/.config/discord/discord" "$HOME/.local/bin/discord"
 fi
