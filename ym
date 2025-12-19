@@ -215,10 +215,6 @@ class DirManager:
     # Also ensure that all files within the directory are consistently
     # zero-padded. As such, this function WILL rename all files once the ID
     # becomes longer than the current longest ID in the directory.
-    #
-    # Returns:
-    # * The file path where to download the song.
-    # * The status file path which should be removed when the download finishes.
     def get_file_metadata(self, args: Args) -> FileMetadata:
         with Lock():
             # Make sure we're not downloading this song already.
