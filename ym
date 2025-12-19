@@ -1,162 +1,277 @@
 #!/usr/bin/env python
 
-import os
 import sys
 import re
-from os.path import expanduser, join
-from typing import List, Optional, Dict, Tuple
+import os
+import fcntl
+from dataclasses import dataclass
+from typing import List, Tuple, Set
+from os.path import expanduser, join, splitext
+from pathlib import Path
+from hashlib import sha256
 from mutagen.easyid3 import EasyID3
 from yt_dlp import YoutubeDL, DownloadError
 
-MUSIC_DIR = "~/music"
-VA = "Various Artists"
-ALBUM = "General"
 
-# Precompiled regex patterns for efficiency
-PATTERN_INDEX = re.compile(r'^(\d+)\s.+\.mp3$')
-PATTERN_NORMALIZE = re.compile(r'^(\d+)(\s.+\.mp3)$')
-PATTERN_SLASHES = re.compile(r'[\\/]')
+def die(string: str):
+    print(string)
+    exit(1)
 
-def sanitize(name: str) -> str:
-    """Replace slashes with underscores and strip whitespace."""
-    return PATTERN_SLASHES.sub('_', name.strip())
 
-def get_directory_data(song_dir: str) -> Tuple[List[int], Dict[str, str]]:
-    """
-    Scan directory once and return:
-    - Sorted list of existing indices
-    - Mapping of (artist - title) to index (lowercase keys)
-    """
-    indices = []
-    name_to_index = {}
+# Args parser.
+class Args:
+    PATTERN_SLASHES = re.compile(r'[\\/]')
 
-    for fname in os.listdir(song_dir):
-        match = PATTERN_INDEX.match(fname)
-        if match:
-            index = match.group(1)
-            indices.append(int(index))
+    def __init__(self, args: List[str]):
+        # Make sure we were given enough args.
+        if len(sys.argv) != 4:
+            die('Usage: ym <artist_name> <song_title> <url>')
 
-            # Extract artist-title portion case-insensitively
-            name_part = fname[len(index)+1:-4].lower()
-            name_to_index[name_part] = index
+        # Parse the args :)
+        self.artist = Args.sanitize_arg(args[1])
+        self.title  = Args.sanitize_arg(args[2])
+        self.url    = args[3].split("&", 1)[0]
 
-    return sorted(indices), name_to_index
+        self.song = f"{self.artist} - {self.title}"
 
-def find_next_index(existing_indices: List[int]) -> int:
-    """Find the smallest missing index in sorted list."""
-    if not existing_indices:
-        return 1
-    max_index = existing_indices[-1]
+    # Sanitize an argument given to the script.
+    @staticmethod
+    def sanitize_arg(arg: str) -> str:
+        return Args.PATTERN_SLASHES.sub('_', arg.strip())
 
-    # No gaps
-    if len(existing_indices) == max_index:
-        return max_index + 1
 
-    # Find first gap
-    return next(i for i in range(1, max_index+2) if i not in existing_indices)
+# Metadata about the file we're downloading to.
+@dataclass
+class FileMetadata:
+    # The ID this song was assigned.
+    index: int
 
-def normalize_filenames(song_dir: str, width: int) -> None:
-    """Rename files to consistent zero-padded width."""
-    for fname in os.listdir(song_dir):
-        match = PATTERN_NORMALIZE.match(fname)
-        if match:
-            old_index, rest = match.groups()
-            new_index = f"{int(old_index):0{width}}"
-            new_name = f"{new_index}{rest}"
-            if fname != new_name:
-                os.rename(
-                    join(song_dir, fname),
-                    join(song_dir, new_name)
-                )
+    # Path to the file we're gonna download to.
+    path: Path
 
-def download_song(url: str, out_path: str) -> None:
-    """Download audio and convert to MP3 with error handling."""
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': out_path,
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'quiet': False,
-        'no_warnings': True
-    }
-    try:
-        with YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-        return True
-    except DownloadError as e:
-        print(f"Download failed: {str(e).split(';')[0]}")
-        # Clean up partial files
-        if os.path.exists(out_path + '.mp3'):
-            os.remove(out_path + '.mp3')
-        return False
+    # Path to the status file that has to be deleted when the download finishes.
+    status: Path
 
-def add_id3_tags(filepath: str, index: int, composer: str,
-                 artist: str, album: str, title: str) -> None:
-    """Add ID3 tags."""
-    audio = EasyID3(filepath)
-    audio['tracknumber'] = [str(index)]
-    audio['composer'] = [composer]
-    audio['artist'] = [artist]
-    audio['album'] = [album]
-    audio['title'] = [title]
-    audio.save()
+    # Download the audio and convert it to mp3
+    def download(self, url: str):
+        # Get the file path without the '.mp3' suffix
+        outfile = str(self.path)[:-4]
 
-def main() -> None:
-    if len(sys.argv) != 4:
-        print('Usage: ym "Artist Name" "Song Title" "URL"')
-        sys.exit(1)
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': outfile,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'quiet': False,
+            'no_warnings': True
+        }
+        try:
+            with YoutubeDL(ydl_opts) as ydl:
+                ydl.download([url])
+        except BaseException as e:
+            # Clean up partial files.
+            if os.path.exists(outfile):
+                os.remove(outfile)
+            if os.path.exists(self.path):
+                os.remove(self.path)
 
-    # Parse the arguments
-    artist = sanitize(sys.argv[1])
-    title = sanitize(sys.argv[2])
-    url = sys.argv[3].split('&', 1)[0]
+            die(f"Download failed. {e}")
 
-    # Output directory setup
-    base_dir = expanduser(f"{MUSIC_DIR}/{VA}/{ALBUM}")
-    os.makedirs(base_dir, exist_ok=True)
 
-    # Single directory scan for both indices and name mapping
-    existing_indices, name_map = get_directory_data(base_dir)
+    # Write ID3 (mp3) tags to the audio file.
+    def write_tags(self, composer: str, artist: str, album: str, title: str):
+        """Add ID3 tags."""
+        audio = EasyID3(self.path)
+        audio['tracknumber'] = [str(self.index)]
+        audio['composer'] = [composer]
+        audio['artist'] = [artist]
+        audio['album'] = [album]
+        audio['title'] = [title]
+        audio.save()
 
-    # Check for duplicates using normalized name
-    normalized_name = f"{artist} - {title}".lower()
-    if normalized_name in name_map:
-        print(f"Duplicate index: {name_map[normalized_name]}.")
-        sys.exit(1)
 
-    # Determine next index and padding width
-    new_index = find_next_index(existing_indices)
-    last_digit_width = len(str(existing_indices[-1]))
-    new_digit_width = max(last_digit_width, len(str(new_index)))
+    # Remove the status file for this song.
+    def remove_status_file(self):
+        os.remove(self.status)
 
-    # Normalize the indices of all filenames
-    if existing_indices and last_digit_width < new_digit_width:
-        normalize_filenames(base_dir, new_digit_width)
 
-    # Construct final filename and path
-    filename = f"{new_index:0{new_digit_width}} {artist} - {title}.mp3"
-    filepath = join(base_dir, filename.replace('"', "'"))
+# A lock we'll use to get a unique access to the music directory.
+# We only need this lock when assigning an ID to the song we want to download.
+# It will be dropped before we actually start downloading.
+class Lock:
+    LOCKFILE = "/tmp/ym_id.lock"
 
-    # Download the song
-    print(f"Downloading to {filename}...")
-    if not download_song(url, filepath[:-4]):
-        sys.exit(1)
+    def __init__(self):
+        self.lockfile = None
 
-    # Add ID3 tags with proper artist mapping
-    print("Adding ID3 tags...")
-    add_id3_tags(
-        filepath=filepath,
-        index=new_index,
-        composer=artist,
-        artist=VA,
-        album=ALBUM,
-        title=title
-    )
+    def __enter__(self):
+        if not self.lockfile:
+            self.lockfile = open(self.LOCKFILE, 'w')
+        fcntl.flock(self.lockfile, fcntl.LOCK_EX)
+        return self
 
-    print(f"{filename}")
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.lockfile:
+            fcntl.flock(self.lockfile, fcntl.LOCK_UN)
+            self.lockfile.close()
+            self.lockfile = None
+
+
+# Music directory manager. Handles everything around the music directory,
+# including assigning a free ID to the downloaded song and duplicates.
+class DirManager:
+    MUSIC_DIR = "~/music"
+    ARTIST = "Various Artists"
+    ALBUM = "General"
+
+    PATTERN_INDEX = re.compile(r'^(\d+)\s.+\.mp3$')
+    PATTERN_NORMALIZE = re.compile(r'^(\d+)(\s.+\.mp3)$')
+
+    def __init__(self):
+        # Create the music directory if it doesn't exist yet.
+        self.output_dir = \
+            expanduser(f"{self.MUSIC_DIR}/{self.ARTIST}/{self.ALBUM}")
+        os.makedirs(self.output_dir, exist_ok=True)
+
+
+    # Scan the directory and return:
+    # * A sorted list of existing IDs
+    # * A set of existing songs in lowercase
+    def get_directory_data(self) -> Tuple[List[int], Set[str]]:
+        ids   = list()
+        songs = set()
+
+        for fname in os.listdir(self.output_dir):
+            match = self.PATTERN_INDEX.match(fname)
+
+            if match:
+                index = match.group(1)
+                ids.append(int(index))
+
+                # Extract (artist, title) portion case-insensitively.
+                stem = fname[len(index) + 1:]
+                stem = splitext(stem)[0]
+                songs.add(stem.lower())
+
+        return (sorted(ids), sorted(songs))
+
+
+    # Given a list of existing IDs, find a new ID that can be assigned.
+    @staticmethod
+    def next_id(ids: List[int]) -> int:
+        if not ids:
+            return 1
+        max_id = ids[-1]
+
+        # If there are no gaps, return the maximum possible ID.
+        if len(ids) == max_id:
+            return max_id  + 1
+
+        # There's a gap. Find the first gap and return its ID.
+        return next(i for i in range(1, max_id + 2) if i not in ids)
+
+
+    # Rename all filenames to have consistent zero-padded IDs.
+    def normalize_filenames(self, width: int) -> None:
+        for fname in os.listdir(self.output_dir):
+            match = self.PATTERN_NORMALIZE.match(fname)
+            if match:
+                old_index, rest = match.groups()
+                new_index = f"{int(old_index):0{width}}"
+                new_name = f"{new_index}{rest}"
+                if fname != new_name:
+                    os.rename(
+                        join(self.output_dir, fname),
+                        join(self.output_dir, new_name)
+                    )
+
+
+    # Ensure we're not downloading this song already. If we're not yet
+    # downloading it, will return the status file that should be deleted when
+    # the download finishes.
+    def ensure_not_downloading_already(self, args: Args) -> Path:
+        # We'll create a song-specific status file before we start downloading.
+        # If someone else beat us to creating it, let them download it instead.
+
+        # Create a hash for this song title in case it's too long for the
+        # filesystem to handle.
+        song_hash = sha256(args.song.lower().encode("utf-8")).hexdigest()[:32]
+        status_file = Path(f"/tmp/.ym_{song_hash}")
+
+        # If the status file exists already, bail out.
+        if os.path.exists(status_file):
+            die(f"We're already downloading this song.\n{status_file}")
+
+        # Nobody's downloading it yet -- create the file.
+        with open(status_file, 'w'):
+            pass
+        return status_file
+
+
+    # Get the path where the new file should be downloaded.
+    # Also ensure that all files within the directory are consistently
+    # zero-padded. As such, this function WILL rename all files once the ID
+    # becomes longer than the current longest ID in the directory.
+    #
+    # Returns:
+    # * The file path where to download the song.
+    # * The status file path which should be removed when the download finishes.
+    def get_file_metadata(self, args: Args) -> FileMetadata:
+        with Lock():
+            # Make sure we're not downloading this song already.
+            status_path = self.ensure_not_downloading_already(args)
+
+            # Get a list of existing indices and songs.
+            ids, songs = self.get_directory_data()
+
+            # Check whether this song exists already. We do it like this instead
+            # of using `exists()` because the file could have a different suffix.
+            if args.song.lower() in songs:
+                os.remove(status_path)
+                die("Duplicate song.")
+
+            # Assign an ID to this song.
+            new_id = DirManager.next_id(ids)
+
+            # Make sure all file names have a consistently zero-padded width.
+            current_max_width = len(str(ids[-1]))
+            new_max_width     = max(current_max_width, len(str(new_id)))
+            if ids and current_max_width < new_max_width:
+                self.normalize_filenames(new_width)
+
+            # Construct the final file path and create the output file
+            file_name = f"{new_id:0{new_max_width}} {args.song}.mp3"
+            file_path = Path(join(self.output_dir, file_name.replace('"', "'")))
+            with open(file_path, 'w') as f:
+                pass
+
+            return FileMetadata(new_id, file_path, status_path)
+
 
 if __name__ == "__main__":
-    main()
+        # Parse the args.
+        args = Args(sys.argv)
+
+        # Get the file path where we'll download the song.
+        # This also handles all parallel downloads and correct ID assignment.
+        dir_manager = DirManager()
+        file = dir_manager.get_file_metadata(args)
+
+        # Download the song
+        print(f"Downloading to {file.path}.")
+        file.download(args.url)
+
+        # Add ID3 tags with proper artist mapping
+        print(f"Writing metadata.")
+        file.write_tags(
+            composer=args.artist,
+            artist=dir_manager.ARTIST,
+            album=dir_manager.ALBUM,
+            title=args.title
+        )
+
+        print(f"{file.path}")
+        os.remove(file.status)
