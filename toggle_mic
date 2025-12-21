@@ -23,10 +23,10 @@ VOLUME=$(pactl get-source-volume "$SOURCE" \
 if [ "$VOLUME" -gt 0 ]; then
     # Mic is ON -> mute
     # Mic is ON -> play sound effect and mute the mic
-    setsid mpv "${SOUND_EFFECT}_uncheck.mp3" --volume=130 >/dev/null 2>&1 &
+    setsid mpv "${SOUND_EFFECT}_uncheck.mp3" >/dev/null 2>&1 &
     pactl set-source-volume "$SOURCE" "0%"
 else
     # Mic is OFF -> play sound effect and unmute the mic
-    setsid mpv "${SOUND_EFFECT}_check.mp3" --volume=130 >/dev/null 2>&1 &
+    setsid mpv "${SOUND_EFFECT}_check.mp3" >/dev/null 2>&1 &
     pactl set-source-volume "$SOURCE" "100%"
 fi
