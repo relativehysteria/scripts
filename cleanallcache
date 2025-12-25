@@ -18,3 +18,26 @@ rm -rf "$HOME/.config/"{Electron,dconf,gtk-3.0,mozilla,pulse,rc,transmission,QtP
 
 # Clean the share directory
 rm -rf "$HOME/.local/share/"{applications,flatpak,krita,man,krita-sysinfo.log,krita.log,recently-used.xbel}
+
+# Clean up all neovim sessions that are older than 30 days
+NVIM_SESSIONS="$HOME/.local/share/nvim/sessions"
+if [ -d "$NVIM_SESSIONS" ]; then
+    THRESHOLD=$((60*60*24*30))
+    NOW=$(date "+%s")
+    for FILE in "$NVIM_SESSIONS"/*; do
+        # Skip if not a regular file
+        [ -f "$FILE" ] || continue
+
+        # Get modification time
+        FILE_MTIME=$(stat -c "%Y" "$FILE" 2>/dev/null)
+        [ -z "$FILE_MTIME" ] && continue
+
+        # Calculate age in seconds
+        AGE=$((NOW - FILE_MTIME))
+
+        # Delete if older than threshold
+        if [ "$AGE" -gt "$THRESHOLD" ]; then
+            rm -f "$FILE"
+        fi
+    done
+fi
