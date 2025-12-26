@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# Get the actual wmenu executable path
+PATH_WITHOUT_SELF=$(printf "%s" "$PATH" \
+    | awk -v RS=: -v ORS=: '$0 != "'"$(dirname "$0")"'" {print}' \
+    | sed 's/:$//')
+wmenu=$(PATH="$PATH_WITHOUT_SELF" command -v wmenu)
+
+$wmenu -N 000000ff -n c0c0c0ff -S 1a1a1aff -s f0f0f0ff "$@"
