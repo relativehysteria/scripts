@@ -6,4 +6,4 @@ PATH_WITHOUT_SELF=$(printf "%s" "$PATH" \
     | sed 's/:$//')
 wmenu=$(PATH="$PATH_WITHOUT_SELF" command -v wmenu)
 
-$wmenu -N 000000ff -n c0c0c0ff -S 1a1a1aff -s f0f0f0ff "$@"
+eval "$wmenu $WMENU_ARGS \"\$@\""
