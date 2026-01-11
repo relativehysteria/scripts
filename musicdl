@@ -26,10 +26,4 @@ done
 
 [ "$url" = "" ] && usage
 
-# Youtube doesn't like tor connections :>
-case "$url" in
-    "https://www.youtube.com"*|"https://music.youtube.com"*) proxy='';;
-    *)                          proxy='--proxy socks5://localhost:9050'
-esac
-
-yt-dlp $proxy -x $mp3 -o "$MUSICROOT/$author/$album/%(playlist_index)s %(title)s.%(ext)s" "$url"
+yt-dlp -x $mp3 -o "$MUSICROOT/$author/$album/%(playlist_index)s %(title)s.%(ext)s" "$url"
