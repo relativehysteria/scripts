@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 # Check if a package name is provided
 if [ -z "$1" ]; then
@@ -7,38 +8,28 @@ if [ -z "$1" ]; then
 fi
 
 pkg="$1"
-dir=$(mktemp -d)
+tmpdir=$(mktemp -d)
 
-# Check if temporary directory was created
-if [ ! -d "$dir" ]; then
-    echo "Failed to create temporary directory."
-    exit 1
-fi
+cleanup() {
+    echo "Cleaning up..."
+    rm -rf "$tmpdir"
+}
 
-echo "Building '$pkg' in '$dir'"
-cd "$dir" || exit
+trap cleanup EXIT INT TERM
 
-# Download the PKGBUILD
-echo "Downloading PKGBUILD for '$pkg'..."
-curl -s "https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=$pkg" -o PKGBUILD
+echo "Cloning AUR repo for '$pkg'..."
+git clone "https://aur.archlinux.org/${pkg}.git" "$tmpdir/$pkg" \
+    || { echo "Failed to clone AUR repo."; exit 1; }
 
-# Check if the PKGBUILD was downloaded successfully
-if [ ! -f PKGBUILD ]; then
-    echo "Failed to download PKGBUILD. Please check the package name or your internet connection."
-    exit 1
-fi
+cd "$tmpdir/$pkg"
 
-# Optionally: Let the user review the PKGBUILD before proceeding
-echo "PKGBUILD downloaded. You can review the file before proceeding."
-echo "Press [Enter] to continue, or [Ctrl+C] to cancel."
+echo
+echo "PKGBUILD downloaded."
+echo "Review files before building:"
+echo "--------------------------------"
+ls -1
+echo "--------------------------------"
+echo "Press [Enter] to continue, Ctrl+C to cancel."
 read -r
 
-# Build the package
-echo "Building the package..."
-makepkg -si || { echo "Build failed."; exit 1; }
-
-# Clean up
-echo "Cleaning up temporary files..."
-rm -rf "$dir"
-
-echo "Package '$pkg' built and installed successfully!"
+makepkg -si
