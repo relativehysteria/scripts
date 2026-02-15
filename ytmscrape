@@ -71,6 +71,8 @@ artist="$(echo $json | jq -r '.header.musicHeaderRenderer.title.runs[0].text')"
 artist_regex=$(printf '%s' "$artist" | sed -e 's/[][\/.^$*+?{}()|"]/\\&/g')
 artist=$(printf '%s' "$artist" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\$/\\\$/g')
 
+echo "$json" > /tmp/json
+
 # Get the required fields and only keep EPs and albums
 listing=$(echo $json | jq '
     .contents
@@ -99,7 +101,7 @@ echo
 echo 'MUSIC_ROOT="$HOME/music"'
 echo
 echo 'download() {'
-echo '    url="https://music.youtube.com/channel/MPREb_$1"'
+echo '    url="https://music.youtube.com/browse/MPREb_$1"'
 echo '    date="$2"'
 echo
 echo '    yt-dlp -x --audio-format mp3 --embed-metadata \'
