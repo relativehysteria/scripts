@@ -17,7 +17,10 @@ echo > "$HOME/".ssh/known_hosts
 rm -rf "$HOME/.config/"{Electron,dconf,gtk-3.0,mozilla,pulse,rc,transmission,QtProject.conf,kritadisplayrc,kritarc,mimeapps.list,pavucontrol.ini}
 
 # Clean the share directory
-rm -rf "$HOME/.local/share/"{applications,flatpak,krita,man,krita-sysinfo.log,krita.log,recently-used.xbel}
+rm -rf "$HOME/.local/share/"{applications,flatpak,krita,man,krita-sysinfo.log,krita.log,recently-used.xbel,kicad,vlc}
+
+# Clean the config directory
+rm -rf "$HOME/.config/"{Electron,dconf,gtk-3.0,menus,mozilla,pulse}
 
 # Clean up all neovim sessions that are older than 30 days
 NVIM_SESSIONS="$HOME/.local/share/nvim/sessions"
