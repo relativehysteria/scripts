@@ -6,9 +6,34 @@ from html import escape
 HOST = "0.0.0.0"
 PORT = 9090
 
+def get_initial_volume():
+    try:
+        out = subprocess.check_output(
+            ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"],
+            text=True
+        ).strip()
+        # Expected: "Volume: 0.61"
+        value = float(out.split()[1])
+        return value
+    except Exception as e:
+        print("Failed to get initial volume:", e)
+        return 1.0  # fallback to 100%
+
+INITIAL_VOLUME = get_initial_volume()
+LOW_VOLUME = 0.55
+
+print(f"Initial volume: {INITIAL_VOLUME:.2f}")
+print(f"Low volume: {LOW_VOLUME:.2f}")
+
 COMMANDS = {
-    "hibernate": "sudo loginctl hibernate".split(),
-    "shutdown": "sudo shutdown -h now".split(),
+    "hibernate": ["sudo", "loginctl", "hibernate"],
+    "shutdown": ["sudo", "shutdown", "-h", "now"],
+    "volume_low": [
+        "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", str(LOW_VOLUME)
+    ],
+    "volume_original": [
+        "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", str(INITIAL_VOLUME)
+    ],
 }
 
 class Handler(BaseHTTPRequestHandler):
