@@ -52,7 +52,8 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
 
         # Build simple HTML response
         response = BytesIO()
-        response.write(b'<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">')
+        response.write(
+                b'<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">')
         response.write(b"<html>\n<title>Upload Result Page</title>\n")
         response.write(b"<body>\n<h2>Upload Result Page</h2>\n<hr>\n")
 
@@ -245,9 +246,12 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         display_path = html.escape(urllib.parse.unquote(self.path))
 
         # Build HTML listing page
-        response.write(b'<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">')
-        response.write(f"<html>\n<title>Directory listing for {display_path}</title>\n".encode())
-        response.write(f"<body>\n<h2>Directory listing for {display_path}</h2>\n<hr>\n".encode())
+        response.write(
+                b'<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">')
+        response.write(f"<html>\n<title>Directory listing for \
+                {display_path}</title>\n".encode())
+        response.write(f"<body>\n<h2>Directory listing for \
+                {display_path}</h2>\n<hr>\n".encode())
 
         # Upload form
         response.write(
@@ -314,5 +318,7 @@ class SimpleHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    # Start test HTTP server on port 9090
-    http.server.test(HandlerClass, ServerClass, port=9090)
+    http.server.test(
+            SimpleHTTPRequestHandler,
+            http.server.ThreadingHTTPServer,
+            port=9090)
