@@ -27,6 +27,7 @@ print(f"Low volume: {LOW_VOLUME:.2f}")
 
 COMMANDS = {
     "hibernate": ["sudo", "loginctl", "hibernate"],
+    "sleep": ["daily", "sleep"],
     "shutdown": ["sudo", "shutdown", "-h", "now"],
     "volume_low": [
         "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", str(LOW_VOLUME)
