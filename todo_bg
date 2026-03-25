@@ -1,0 +1,30 @@
+#!/bin/sh
+
+TODO_FILE="$HOME/documents/textfiles/TODO"
+IMG="/tmp/todo-bg.png"
+FONT="Fira Code 14"
+
+render() {
+    swaymsg -t get_outputs | jq -r '.[] | select(.active) | "\(.name) \(.current_mode.width) \(.current_mode.height)"' |
+    while read -r NAME WIDTH HEIGHT; do
+        pango-view "$TODO_FILE" \
+            --font="$FONT" \
+            --foreground="#ffffff" \
+            --background="#000000" \
+            --margin=20 \
+            --width="$WIDTH" \
+            --height="$HEIGHT" \
+            --ellipsize=none \
+            --no-display \
+            --output="$IMG"
+
+        swaymsg output "$NAME" bg "$IMG" fill
+    done
+}
+
+[ -f "$TODO_FILE" ] || exit 0
+
+render
+while inotifywait -e close_write "$TODO_FILE" >/dev/null 2>&1 || true; do
+    render
+done
