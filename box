@@ -1,0 +1,139 @@
+#!/bin/sh
+
+chars=$( cat <<'EOF'
+─ light horizontal
+━ heavy horizontal
+│ light vertical
+┃ heavy vertical
+┄ light triple dash horizontal
+┅ heavy triple dash horizontal
+┆ light triple dash vertical
+┇ heavy triple dash vertical
+┈ light quadruple dash horizontal
+┉ heavy quadruple dash horizontal
+┊ light quadruple dash vertical
+┋ heavy quadruple dash vertical
+┌ light down and right
+┍ down light and right heavy
+┎ down heavy and right light
+┏ heavy down and right
+┐ light down and left
+┑ down light and left heavy
+┒ down heavy and left light
+┓ heavy down and left
+└ light up and right
+┕ up light and right heavy
+┖ up heavy and right light
+┗ heavy up and right
+┘ light up and left
+┙ up light and left heavy
+┚ up heavy and left light
+┛ heavy up and left
+├ light vertical and right
+┝ vertical light and right heavy
+┞ up heavy and right down light
+┟ down heavy and right up light
+┠ vertical heavy and right light
+┡ down light and right up heavy
+┢ up light and right down heavy
+┣ heavy vertical and right
+┤ light vertical and left
+┥ vertical light and left heavy
+┦ up heavy and left down light
+┧ down heavy and left up light
+┨ vertical heavy and left light
+┩ down light and left up heavy
+┪ up light and left down heavy
+┫ heavy vertical and left
+┬ light down and horizontal
+┭ left heavy and right down light
+┮ right heavy and left down light
+┯ down light and horizontal heavy
+┰ down heavy and horizontal light
+┱ right light and left down heavy
+┲ left light and right down heavy
+┳ heavy down and horizontal
+┴ light up and horizontal
+┵ left heavy and right up light
+┶ right heavy and left up light
+┷ up light and horizontal heavy
+┸ up heavy and horizontal light
+┹ right light and left up heavy
+┺ left light and right up heavy
+┻ heavy up and horizontal
+┼ light vertical and horizontal
+┽ left heavy and right vertical light
+┾ right heavy and left vertical light
+┿ vertical light and horizontal heavy
+╀ up heavy and down horizontal light
+╁ down heavy and up horizontal light
+╂ vertical heavy and horizontal light
+╃ left up heavy and right down light
+╄ right up heavy and left down light
+╅ left down heavy and right up light
+╆ right down heavy and left up light
+╇ down light and up horizontal heavy
+╈ up light and down horizontal heavy
+╉ right light and left vertical heavy
+╊ left light and right vertical heavy
+╋ heavy vertical and horizontal
+╌ light double dash horizontal
+╍ heavy double dash horizontal
+╎ light double dash vertical
+╏ heavy double dash vertical
+═ double horizontal
+║ double vertical
+╒ down single and right double
+╓ down double and right single
+╔ double down and right
+╕ down single and left double
+╖ down double and left single
+╗ double down and left
+╘ up single and right double
+╙ up double and right single
+╚ double up and right
+╛ up single and left double
+╜ up double and left single
+╝ double up and left
+╞ vertical single and right double
+╟ vertical double and right single
+╠ double vertical and right
+╡ vertical single and left double
+╢ vertical double and left single
+╣ double vertical and left
+╤ down single and horizontal double
+╥ down double and horizontal single
+╦ double down and horizontal
+╧ up single and horizontal double
+╨ up double and horizontal single
+╩ double up and horizontal
+╪ vertical single and horizontal double
+╫ vertical double and horizontal single
+╬ double vertical and horizontal
+╭ light arc down and right
+╮ light arc down and left
+╯ light arc up and left
+╰ light arc up and right
+╱ light diagonal upper right to lower left
+╲ light diagonal upper left to lower right
+╳ light diagonal cross
+╴ light left
+╵ light up
+╶ light right
+╷ light down
+╸ heavy left
+╹ heavy up
+╺ heavy right
+╻ heavy down
+╼ light left and heavy right
+╽ light up and heavy down
+╾ heavy left and light right
+╿ heavy up and light down
+EOF
+)
+
+selected=$(printf "%s\n" "$chars" | wmenu -i -l 20 | awk '{print $1}')
+
+if [ -n "$selected" ]; then
+    printf "%s" "$selected" | wl-copy
+fi

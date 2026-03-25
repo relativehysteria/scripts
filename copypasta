@@ -1,9 +1,0 @@
-#!/bin/sh
-
-pasta_dir="$HOME/.local/share/pastas"
-
-file=$(ls "$pasta_dir" | wmenu -i)
-
-[ "$file" = "" ] && exit
-
-cat "$pasta_dir/$file" | wl-copy
