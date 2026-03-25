@@ -1,13 +1,16 @@
 #!/bin/sh
 
-TODO_FILE="$HOME/documents/textfiles/TODO"
+# Make sure the TODO env var is set and that it points to a valid file.
+[ "$TODO" = "" ] && exit 0
+[ -f "$TODO" ] || exit 0
+
 IMG="/tmp/todo-bg.png"
 FONT="Fira Code 14"
 
 render() {
     swaymsg -t get_outputs | jq -r '.[] | select(.active) | "\(.name) \(.current_mode.width) \(.current_mode.height)"' |
     while read -r NAME WIDTH HEIGHT; do
-        pango-view "$TODO_FILE" \
+        pango-view "$TODO" \
             --font="$FONT" \
             --foreground="#ffffff" \
             --background="#000000" \
@@ -22,9 +25,7 @@ render() {
     done
 }
 
-[ -f "$TODO_FILE" ] || exit 0
-
 render
-while inotifywait -e close_write "$TODO_FILE" >/dev/null 2>&1 || true; do
+while inotifywait -e close_write "$TODO" >/dev/null 2>&1 || true; do
     render
 done
