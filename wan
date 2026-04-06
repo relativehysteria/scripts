@@ -2,11 +2,12 @@
 
 WLAN=wlan0
 WAN=enp1s0
+SSID="FBI minivan"
 
 iwctl station wlan0 disconnect
 iwctl station wlan0 scan
 sleep 2
-iwctl station wlan0 connect "FBI minivan"
+iwctl station wlan0 connect "$SSID"
 
 sudo sysctl net.ipv4.ip_forward=1
 
