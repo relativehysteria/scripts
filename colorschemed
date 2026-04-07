@@ -1,0 +1,38 @@
+#!/bin/sh
+
+switch_foot() {
+    if should_use_light; then
+        sed -i "s/initial-color-theme=dark/initial-color-theme=light/" \
+            "$XDG_CONFIG_HOME/foot/foot.ini"
+        pkill -u "$USER" --signal=SIGUSR2 '^foot$'
+    else
+        sed -i "s/initial-color-theme=light/initial-color-theme=dark/" \
+            "$XDG_CONFIG_HOME/foot/foot.ini"
+        pkill -u "$USER" --signal=SIGUSR1 '^foot$'
+    fi
+}
+
+switch_nvim() {
+    for s in /run/user/$(id -u)/nvim.*; do
+        [ -S "$s" ] || continue
+        nvim --server "$s" --remote-send \
+            '<Cmd>call globals#apply_colorscheme_from_system()<CR>'
+    done
+}
+
+switch_todo() {
+    pkill -u "$USER" --signal=SIGUSR1 '^todo_bg$'
+}
+
+while true; do
+    # Execute the thingies.
+    switch_foot
+    switch_nvim
+    switch_todo
+
+    # Wait until the next change.
+    next=$(should_use_light)
+    [ -z "$next" ] && exit
+    sleep $next
+    sleep 1
+done

@@ -11,9 +11,9 @@ current_minute=$(date +"%M" | sed 's/^0*//')
 [ "$current_minute" = "" ] && current_minute=0
 
 # Light / dark schedule
-light_hour=7
+light_hour=5
 light_minute=0
-dark_hour=18
+dark_hour=19
 dark_minute=0
 
 # Helper: check if we're in light period

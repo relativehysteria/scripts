@@ -7,13 +7,24 @@
 IMG="/tmp/todo-bg.png"
 FONT="Fira Code 14"
 
+WHITE="#FFFFFF"
+BLACK="#000000"
+
+FG=$WHITE
+BG=$BLACK
+
 render() {
     swaymsg -t get_outputs | jq -r '.[] | select(.active) | "\(.name) \(.current_mode.width) \(.current_mode.height)"' |
     while read -r NAME WIDTH HEIGHT; do
+        if should_use_light; then
+            FG=$BLACK
+            BG=$WHITE
+        fi
+
         pango-view "$TODO" \
             --font="$FONT" \
-            --foreground="#ffffff" \
-            --background="#000000" \
+            --foreground="$FG" \
+            --background="$BG" \
             --margin=20 \
             --width="$WIDTH" \
             --height="$HEIGHT" \
@@ -26,6 +37,31 @@ render() {
 }
 
 render
-while inotifywait -e close_write "$TODO" >/dev/null 2>&1 || true; do
+
+# signal flag
+RUN_RENDER=0
+
+handle_usr() {
+    RUN_RENDER=1
+}
+
+# trap signals
+trap 'handle_usr' USR1 USR2
+
+while :; do
+    # wait for either file change or signal
+    inotifywait -e close_write "$TODO" >/dev/null 2>&1 &
+    WAIT_PID=$!
+
+    # wait for inotify OR interruption
+    wait $WAIT_PID 2>/dev/null
+
+    # if signal arrived, RUN_RENDER will be 1
+    if [ "$RUN_RENDER" -eq 1 ]; then
+        RUN_RENDER=0
+        kill "$WAIT_PID" 2>/dev/null
+        wait "$WAIT_PID" 2>/dev/null
+    fi
+
     render
 done
