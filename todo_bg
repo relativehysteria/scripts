@@ -7,7 +7,7 @@
 IMG="/tmp/todo-bg.png"
 FONT="Fira Code 14"
 
-WHITE="#FFFFFF"
+WHITE="#F4F3F1"
 BLACK="#000000"
 
 FG=$WHITE
