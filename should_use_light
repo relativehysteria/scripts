@@ -1,54 +1,42 @@
 #!/bin/sh
 
-# Determines whether the current time falls within a configured light period
-# and prints the number of seconds until the next light/dark transition.
-# Exits with status 0 during the light period, or 1 during the dark period.
+# Config
+light_time="06:20"
+dark_time="19:00"
 
-# Current time
-current_epoch=$(date +%s)
-current_hour=$(date +"%H" | sed 's/^0*//')
-current_minute=$(date +"%M" | sed 's/^0*//')
-[ "$current_minute" = "" ] && current_minute=0
+now=$(date +%s)
+today=$(date +%F)
 
-# Light / dark schedule
-light_hour=5
-light_minute=0
-dark_hour=19
-dark_minute=0
+light_today=$(date -d "$today $light_time" +%s)
+dark_today=$(date -d "$today $dark_time" +%s)
 
-# Helper: check if we're in light period
-use_light() {
-    if [ "$light_hour" -lt "$dark_hour" ]; then
-        [ "$current_hour" -gt "$light_hour" ] && [ "$current_hour" -lt "$dark_hour" ] || \
-        { [ "$current_hour" -eq "$light_hour" ] && [ "$current_minute" -ge "$light_minute" ]; } || \
-        { [ "$current_hour" -eq "$dark_hour" ] && [ "$current_minute" -lt "$dark_minute" ]; }
+if [ "$light_today" -le "$dark_today" ]; then
+    # Normal case: light -> dark same day
+    if [ "$now" -ge "$light_today" ] && [ "$now" -lt "$dark_today" ]; then
+        next="$dark_today"
+        status=0
     else
-        [ "$current_hour" -lt "$dark_hour" ] || \
-        { [ "$current_hour" -eq "$dark_hour" ] && [ "$current_minute" -lt "$dark_minute" ]; }
+        if [ "$now" -lt "$light_today" ]; then
+            next="$light_today"
+        else
+            next=$(date -d "tomorrow $light_time" +%s)
+        fi
+        status=1
     fi
-}
-
-# Compute today's transition times
-today=$(date +"%Y-%m-%d")
-light_epoch=$(date -d "$today $light_hour:$light_minute" +%s)
-dark_epoch=$(date -d "$today $dark_hour:$dark_minute" +%s)
-
-if use_light; then
-    # Next cycle is dark
-    if [ "$current_epoch" -lt "$dark_epoch" ]; then
-        next_epoch="$dark_epoch"
-    else
-        next_epoch=$(date -d "tomorrow $dark_hour:$dark_minute" +%s)
-    fi
-    echo $((next_epoch - current_epoch))
-    exit 0
 else
-    # Next cycle is light
-    if [ "$current_epoch" -lt "$light_epoch" ]; then
-        next_epoch="$light_epoch"
+    # Wrap-around case (light spans midnight)
+    if [ "$now" -ge "$light_today" ] || [ "$now" -lt "$dark_today" ]; then
+        if [ "$now" -lt "$dark_today" ]; then
+            next="$dark_today"
+        else
+            next=$(date -d "tomorrow $dark_time" +%s)
+        fi
+        status=0
     else
-        next_epoch=$(date -d "tomorrow $light_hour:$light_minute" +%s)
+        next="$light_today"
+        status=1
     fi
-    echo $((next_epoch - current_epoch))
-    exit 1
 fi
+
+echo $((next - now))
+exit $status
