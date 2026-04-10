@@ -9,11 +9,11 @@ done
 switch_foot() {
     if should_use_light; then
         sed -i "s/initial-color-theme=dark/initial-color-theme=light/" \
-            "$XDG_CONFIG_HOME/foot/foot.ini"
+            "$XDG_CONFIG_HOME/foot/init-color-theme"
         pkill -u "$USER" --signal=SIGUSR2 '^foot$'
     else
         sed -i "s/initial-color-theme=light/initial-color-theme=dark/" \
-            "$XDG_CONFIG_HOME/foot/foot.ini"
+            "$XDG_CONFIG_HOME/foot/init-color-theme"
         pkill -u "$USER" --signal=SIGUSR1 '^foot$'
     fi
 }
