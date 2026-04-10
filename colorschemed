@@ -1,5 +1,11 @@
 #!/bin/sh
 
+# Kill other running instances.
+PNAME=$(basename "$0")
+for pid in $(pgrep -u "$USER" "^$PNAME$"); do
+    [ "$pid" != "$$" ] && kill "$pid"
+done
+
 switch_foot() {
     if should_use_light; then
         sed -i "s/initial-color-theme=dark/initial-color-theme=light/" \

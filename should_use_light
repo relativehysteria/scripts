@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Config
-light_time="06:20"
+light_time="07:20"
 dark_time="19:00"
 
 now=$(date +%s)
