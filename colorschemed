@@ -7,13 +7,19 @@ for pid in $(pgrep -u "$USER" "^$PNAME$"); do
 done
 
 switch_foot() {
+    init_file="$XDG_CONFIG_HOME/foot/init-color-theme"
+
+    if ! [ -f "$init_file" ]; then
+        echo "initial-color-theme=dark" > "$init_file"
+    fi
+
     if should_use_light; then
         sed -i "s/initial-color-theme=dark/initial-color-theme=light/" \
-            "$XDG_CONFIG_HOME/foot/init-color-theme"
+            "$init_file"
         pkill -u "$USER" --signal=SIGUSR2 '^foot$'
     else
         sed -i "s/initial-color-theme=light/initial-color-theme=dark/" \
-            "$XDG_CONFIG_HOME/foot/init-color-theme"
+            "$init_file"
         pkill -u "$USER" --signal=SIGUSR1 '^foot$'
     fi
 }
