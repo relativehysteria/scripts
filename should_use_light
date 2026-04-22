@@ -1,40 +1,27 @@
 #!/bin/sh
 
-light_time=$(solcalc | awk '{print $1}')
-dark_time=$(solcalc | awk '{print $2}')
+read light_time dark_time <<EOF
+$(solcalc)
+EOF
 
 now=$(date +%s)
-today=$(date +%F)
 
-light_today=$(date -d "$today $light_time" +%s)
-dark_today=$(date -d "$today $dark_time" +%s)
+light=$(date -d "today $light_time" +%s)
+dark=$(date -d "today $dark_time" +%s)
 
-if [ "$light_today" -le "$dark_today" ]; then
-    # Normal case: light -> dark same day
-    if [ "$now" -ge "$light_today" ] && [ "$now" -lt "$dark_today" ]; then
-        next="$dark_today"
-        status=0
-    else
-        if [ "$now" -lt "$light_today" ]; then
-            next="$light_today"
-        else
-            next=$(date -d "tomorrow $light_time" +%s)
-        fi
-        status=1
-    fi
+# normalize wrap
+[ "$dark" -lt "$light" ] && dark=$((dark + 86400))
+
+if [ "$now" -ge "$light" ] && [ "$now" -lt "$dark" ]; then
+    next=$dark
+    status=0
 else
-    # Wrap-around case (light spans midnight)
-    if [ "$now" -ge "$light_today" ] || [ "$now" -lt "$dark_today" ]; then
-        if [ "$now" -lt "$dark_today" ]; then
-            next="$dark_today"
-        else
-            next=$(date -d "tomorrow $dark_time" +%s)
-        fi
-        status=0
+    if [ "$now" -lt "$light" ]; then
+        next=$light
     else
-        next="$light_today"
-        status=1
+        next=$(date -d "tomorrow $light_time" +%s)
     fi
+    status=1
 fi
 
 echo $((next - now))
