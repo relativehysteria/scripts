@@ -1,0 +1,99 @@
+#!/usr/bin/env python
+
+# Documentation can be found here:
+# https://gml.noaa.gov/grad/solcalc/calcdetails.html
+
+import math
+from math import radians as rad
+from math import degrees as deg
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+from typing import Optional
+
+# Brno lat/lon is used.
+TZ = ZoneInfo("Europe/Prague")
+LAT = 49.195
+LON = 16.611
+
+# Official sunrise/sunset zenith. Standard atmospheric refraction correction
+# used in sunrise definitions.
+ZENITH = 90.0 + 0.833
+
+def sun_time_utc(day_of_year: int, sunrise: bool) -> Optional[float]:
+    """
+    Compute sunrise or sunset time in UTC hours (0-24).
+
+    Returns the UTC hour of event if it happens (won't on polar edges).
+    """
+    # Convert longitude  into time offset (15 degrees = 1 hour).
+    lng_hour = LON / 15.0
+
+    # Initial approximation (NOAA model seed value).
+    base_hour = 6.0 if sunrise else 18.0
+    init_approx_time = day_of_year + ((base_hour - lng_hour) / 24.0)
+
+    # Solar mean anomaly (orbital position approximation).
+    mean_anomaly = (0.9856 * init_approx_time) - 3.289
+
+    # True longitude of the sun.
+    sun_longitude  = mean_anomaly
+    sun_longitude += 1.916 * math.sin(rad(mean_anomaly))
+    sun_longitude += 0.020 * math.sin(rad(2 * mean_anomaly))
+    sun_longitude += 282.634
+    sun_longitude %= 360
+
+    # Right ascension. Convert to celestial coordinate system.
+    right_ascension = 0.91764 * math.tan(rad(sun_longitude))
+    right_ascension = deg(math.atan(right_ascension)) % 360
+
+    # Quadrant correction for right ascension stability.
+    lng_quadr = (sun_longitude // 90) * 90
+    ra_quadr = (right_ascension // 90) * 90
+
+    # Convert to hours.
+    right_ascension = (right_ascension + (lng_quadr - ra_quadr)) / 15.0
+
+    # Solar declinaion (sun's angle relative to equator).
+    sin_decl = 0.39782 * math.sin(rad(sun_longitude))
+    cos_decl = math.cos(math.asin(sin_decl))
+
+    # Hour angle: determines horizon crossing.
+    cos_hour_angle = math.cos(rad(ZENITH)) - sin_decl * math.sin(rad(LAT))
+    cos_hour_angle = cos_hour_angle / (cos_decl * math.cos(rad(LAT)))
+
+    # Invalid range means polar day/night.
+    if cos_hour_angle < -1.0 or cos_hour_angle > 1.0:
+        return None
+
+    # Hour angle in hours.
+    hour_angle  = deg(math.acos(cos_hour_angle))
+    hour_angle  = hour_angle if not sunrise else 360.0 - hour_angle
+    hour_angle /= 15.0
+
+    # Local solar time approximation.
+    time = hour_angle + right_ascension - (0.06571 * init_approx_time) - 6.622
+
+    # Convert to UTC and return.
+    return (time - lng_hour) % 24.0
+
+
+def to_dt(date: datetime, hours_utc: Optional[float]) -> Optional[datetime]:
+    if hours_utc is None:
+        return
+
+    date  = datetime(date.year, date.month, date.day, tzinfo=ZoneInfo("UTC"))
+    date += timedelta(hours=hours_utc)
+    return date.astimezone(TZ)
+
+def formatted(date: datetime) -> str:
+    return f"{date.hour:02}:{date.minute:02}"
+
+
+if __name__ == "__main__":
+    now = datetime.now(TZ)
+    day_of_year = now.timetuple().tm_yday
+
+    sunrise = to_dt(now, sun_time_utc(day_of_year, True))
+    sunset  = to_dt(now, sun_time_utc(day_of_year, False))
+
+    print(formatted(sunrise), formatted(sunset))
