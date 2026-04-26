@@ -1,10 +1,17 @@
 #!/bin/sh
 
-# Kill other running instances.
+
+# If another instance is running, simply signal it to reload and exit.
 PNAME=$(basename "$0")
+RELOAD_REQUESTED=0
+trap 'RELOAD_REQUESTED=1' USR1
+
 for pid in $(pgrep -u "$USER" "^$PNAME$"); do
-    [ "$pid" != "$$" ] && kill "$pid"
+    [ "$pid" != "$$" ] && kill -USR1 "$pid"
 done
+
+pgrep -u "$USER" "^$PNAME$" | grep -qv "^$$$" && exit 0
+
 
 switch_foot() {
     init_file="$XDG_CONFIG_HOME/foot/init-color-theme"
@@ -37,14 +44,22 @@ switch_todo() {
 }
 
 while true; do
+    RELOAD_REQUESTED=0
+
     # Execute the thingies.
     switch_foot
     switch_nvim
     switch_todo
 
-    # Wait until the next change.
     next=$(should_use_light)
     [ -z "$next" ] && exit
-    sleep $next
-    sleep 1
+
+    # Sleep, but stay interruptible.
+    while [ "$next" -gt 0 ]; do
+        sleep 1
+        next=$((next - 1))
+
+        # If signal received, restart loop immediately.
+        [ "$RELOAD_REQUESTED" -eq 1 ] && break
+    done
 done
