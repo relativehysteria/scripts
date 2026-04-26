@@ -1,7 +1,8 @@
 #!/bin/sh
 
+# We use a modified zenith to artificially prolong the darkness time.
 read light_time dark_time <<EOF
-$(solcalc)
+$(solcalc 87)
 EOF
 
 now=$(date +%s)

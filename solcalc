@@ -9,15 +9,20 @@ from math import degrees as deg
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Optional
+from sys import argv
 
 # Brno lat/lon is used.
 TZ = ZoneInfo("Europe/Prague")
 LAT = 49.195
 LON = 16.611
 
-# Official sunrise/sunset zenith. Standard atmospheric refraction correction
-# used in sunrise definitions.
-ZENITH = 90.0 + 0.833
+try:
+    # Try parsing the zenith from the user argument if given.
+    ZENITH = float(argv[1])
+except:
+    # Otherwise use the official zenith, with standard atmospheric refraction
+    # correction.
+    ZENITH = 90.0 + 0.833
 
 def sun_time_utc(day_of_year: int, sunrise: bool) -> Optional[float]:
     """
