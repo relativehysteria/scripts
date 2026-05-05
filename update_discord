@@ -5,8 +5,6 @@ cd "$(mktemp -d)" || exit 1
 wget -O "discord.tar.gz" 'https://discord.com/api/download?platform=linux&format=tar.gz'
 tar -xvf "discord.tar.gz"
 
-mv "./Discord/Discord" "./Discord/discord"
-
 mkdir -p  "$HOME/.config/discord"
 cp -a "./Discord/." "$HOME/.config/discord/"
 
