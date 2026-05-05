@@ -1,0 +1,20 @@
+#!/bin/sh
+
+artist="$1"
+album="$2"
+
+if [ "$artist" = "" ] || [ "$album" = "" ]; then
+    echo "Usage: $0 <artist> <album>"
+fi
+
+album_dir="$HOME/music"/"$artist"/"$album"
+
+if ! [ -d "$album_dir" ]; then
+    echo "$album_dir doesn't exist"
+fi
+
+set -eu
+
+adb shell "mkdir -p /storage/emulated/0/Music/\"$artist\""
+adb push --sync "$album_dir" "/storage/emulated/0/Music/$artist/"
+adb shell 'am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Music/'
