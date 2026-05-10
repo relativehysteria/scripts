@@ -101,4 +101,5 @@ if __name__ == "__main__":
     sunrise = to_dt(now, sun_time_utc(day_of_year, True))
     sunset  = to_dt(now, sun_time_utc(day_of_year, False))
 
-    print(formatted(sunrise), formatted(sunset))
+    if sunrise and sunset:
+        print(formatted(sunrise), formatted(sunset))
