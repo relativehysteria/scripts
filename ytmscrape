@@ -30,10 +30,8 @@ print_help() {
 [ "$main_url" = "" ] && print_help && exit
 
 # Get the channel ID
-channel_id=$(echo "$main_url" | sed \
-    -e 's/\/browse\//\/channel\//g' \
-    -e 's/\/channel\/MPADUC/\/channel\/UC/g' \
-    -e 's/.*music.youtube.com\/channel\/UC\(.*\)?*.*/\1/g')
+channel_id=$(basename "$main_url")
+channel_id="${channel_id#??}"
 
 # Make sure that we got the correct channel ID.
 # Technically `wc -c` should be better here, but this is more future proof
