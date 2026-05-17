@@ -1,11 +1,15 @@
 #!/bin/sh
 
 INPUT="$1"
-OUTPUT="compressed.mp4"
+OUTPUT="$2"
 
 if [ -z "$INPUT" ]; then
-    echo "Usage: $0 input_video"
+    echo "Usage: $0 <input_video> [output_video]"
     exit 1
+fi
+
+if [ -z "$OUTPUT" ]; then
+    OUTPUT="compressed.mp4"
 fi
 
 # ---------- SETTINGS ----------
