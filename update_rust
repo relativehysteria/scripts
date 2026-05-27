@@ -7,7 +7,7 @@ fi
 
 install_crates() {
     cargo install --locked tokei cargo-info tokio-console cargo-expand ripgrep \
-        cargo-show-asm
+        cargo-show-asm cargo-watch
 }
 
 
