@@ -8,18 +8,41 @@ from concurrent.futures import ThreadPoolExecutor
 from bs4 import BeautifulSoup
 from requests import get
 
-print("This script has been obsoleted by the `bandsintown` script.")
-
 # Concerts in the following locations will be printed in different color
 PREFERRED_LOCATIONS = { "Austria", "Czech Republic", "Slovakia", "Germany" }
 
 ARTISTS = {
+    "201140-mono",
+    "67042-zazen-boys",
+    "559-giraffes-giraffes",
+    "438069-seefeel",
+    "109314-caroline",
+    "134405-shame",
+    "10390101-my-new-band-believe",
+    "1352869-idles",
+    "70202-mogwai",
+    "221050-cardinals",
+    "9352489-remember-sports",
+    "9405704-belair-lip-bombs",
+    "8990889-soccer-mommy",
+    "9563889-indigo-de-souza",
+    "9685174-chanel-beads",
+    "9993914-lowertown",
+    "7680934-forth-wanderers",
+    "4561218-a-winged-victory-for-the-sullen",
+    "182957-godspeed-you-black-emperor",
+    "9613464-soot-sprite",
+    "369590-los-campesinos",
+    "8403918-klangstof",
+    "253846-radiohead",
+    "220083-thom-yorke",
+    "10355080-westside-cowboy",
+    "5607023-ratboys",
     "3768296-rum-jungle",
     "590705-bon-iver",
     "4126816-wolf-alice",
     "9329894-queens-pleasure",
     "5806184-jeff-rosenstock",
-    "8959074-tamino",
     "605621-tom-rosenthal",
     "10098289-ichiko-aoba",
     "383629-balthazar",
@@ -62,12 +85,13 @@ class Concert:
 
     @staticmethod
     def _get_soup(url: str) -> Optional[BeautifulSoup]:
-        headers = { "User-Agent": "Mozilla/5.0 Gecko/20100101 Firefox/145.0" }
+        headers = { "User-Agent": "" }
         try:
             r = get(url, headers=headers)
             r.raise_for_status()
             return BeautifulSoup(r.text, features="lxml")
-        except:
+        except Exception as e:
+            print(e)
             return None
 
     @classmethod
