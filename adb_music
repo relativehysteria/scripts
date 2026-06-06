@@ -5,6 +5,7 @@ album="$2"
 
 if [ "$artist" = "" ] || [ "$album" = "" ]; then
     echo "Usage: $0 <artist> <album>"
+    exit
 fi
 
 album_dir="$HOME/music"/"$artist"/"$album"
