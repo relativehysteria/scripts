@@ -2,7 +2,7 @@
 
 # We use a modified zenith to artificially prolong the darkness time.
 read light_time dark_time <<EOF
-$(solcalc 87)
+$(solcalc 80)
 EOF
 
 now=$(date +%s)
