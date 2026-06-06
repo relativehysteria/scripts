@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# Check that trans exists.
+if ! [ -f "/usr/bin/trans" ]; then
+    echo "trans not in /usr/bin/"
+    exit 1
+fi
+
+# Check that we were given something to translate.
+if [ "$2" = "" ]; then
+    echo "usage: $0 <term>"
+fi
+
+# Make sure the cache directory exists.
+cache_dir="$XDG_DATA_HOME/trans/"
+mkdir -p "$cache_dir"
+
+# Check whether this term is already cached.
+hashed=$(echo -n "$1 $2" | sha1sum | awk '{print $1}')
+cached_file="$cache_dir/$hashed"
+
+if [ -f "$cached_file" ]; then
+    cat "$cached_file"
+    exit
+fi
+
+# File doesn't exist. Fetch and create it.
+res=$(/usr/bin/trans "$1" "$2")
+echo "$res" > "$cached_file"
+cat "$cached_file"
