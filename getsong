@@ -1,65 +1,112 @@
 #!/bin/sh
 
-json=$(curl --silent 'https://www.youtube.com/youtubei/v1/search' \
-  --compressed \
-  -X POST \
-  -H 'User-Agent: Mozilla/5.0' \
-  -H 'Accept: application/json' \
-  -H 'Content-Type: application/json' \
-  --data-raw "$(jq -c -n \
-    --arg query "$1" \
-    --arg date "$(date +%Y%m01)" \
-    '{
-      context: {
-        client: {
-          clientName: "WEB_REMIX",
-          clientVersion: ("1." + $date + ".00.00")
-        }
-      },
-      query: $query,
-    }'
-  )")
+[ "$1" = "" ] && exit
 
-songdata=$(echo "$json" | jq '
-[
-    .contents
-    .tabbedSearchResultsRenderer
-    .tabs[0]
-    .tabRenderer
-    .content
-    .sectionListRenderer
-    .contents
-    | map(
-        select(
-            .itemSectionRenderer
-            .contents[0]
-            .musicResponsiveListItemRenderer?
-            .overlay?
-            .musicItemThumbnailOverlayRenderer?
-            .content?
-            .musicPlayButtonRenderer?
-            .playNavigationEndpoint?
-            .watchEndpoint?
-            .watchEndpointMusicSupportedConfigs?
-            .watchEndpointMusicConfig?
-            .musicVideoType == "MUSIC_VIDEO_TYPE_ATV"
-        )
+# Query YouTube Music search and return the first song-like result.
+json=$(
+    curl --silent --compressed \
+        'https://www.youtube.com/youtubei/v1/search' \
+        -X POST \
+        -H 'User-Agent: Mozilla/5.0' \
+        -H 'Accept: application/json' \
+        -H 'Content-Type: application/json' \
+        --data-raw "$(
+            jq -cn \
+                --arg query "$1" \
+                --arg date "$(date +%Y%m01)" '
+                {
+                    context: {
+                        client: {
+                            clientName: "WEB_REMIX",
+                            clientVersion: ("1." + $date + ".00.00")
+                        }
+                    },
+                    query: $query
+                }
+            '
+        )"
+)
+
+# Main search results container.
+section_list=$(
+    jq '
+        .contents
+        .tabbedSearchResultsRenderer
+        .tabs[0]
+        .tabRenderer
+        .content
+        .sectionListRenderer
+    ' <<<"$json"
+)
+
+# Top card shown for strong matches (song, album, artist, etc.).
+card_shelf=$(jq '.contents[1].musicCardShelfRenderer' <<<"$section_list")
+
+watch_endpoint=$(
+    jq -r '.title.runs[0].navigationEndpoint.watchEndpoint' \
+        <<<"$card_shelf"
+)
+
+video_type=$(
+    jq -r '
+        .watchEndpointMusicSupportedConfigs
+        .watchEndpointMusicConfig
+        .musicVideoType
+    ' <<<"$watch_endpoint"
+)
+
+if [ "$video_type" = "MUSIC_VIDEO_TYPE_ATV" ]; then
+    # The top card is already a playable song.
+    videoid=$(jq -r '.videoId' <<<"$watch_endpoint")
+    song=$(jq -r '.title.runs[0].text' <<<"$card_shelf")
+    artist=$(jq -r '.subtitle.runs[2].text' <<<"$card_shelf")
+else
+    # Fall back to the first song result in the list.
+    items=$(
+        jq '
+            [
+                .contents
+                | map(
+                    select(
+                        .itemSectionRenderer
+                        .contents[0]
+                        .musicResponsiveListItemRenderer?
+                        .overlay?
+                        .musicItemThumbnailOverlayRenderer?
+                        .content?
+                        .musicPlayButtonRenderer?
+                        .playNavigationEndpoint?
+                        .watchEndpoint?
+                        .watchEndpointMusicSupportedConfigs?
+                        .watchEndpointMusicConfig?
+                        .musicVideoType == "MUSIC_VIDEO_TYPE_ATV"
+                    )
+                )
+                .[]
+                .itemSectionRenderer
+                .contents[]
+                .musicResponsiveListItemRenderer
+                .flexColumns[]
+                .musicResponsiveListItemFlexColumnRenderer
+            ]
+        ' <<<"$section_list"
     )
-    .[]
-    .itemSectionRenderer
-    .contents[]
-    .musicResponsiveListItemRenderer
-    .flexColumns[]
-    .musicResponsiveListItemFlexColumnRenderer
-]
-')
 
-videoid=$(echo "$songdata" | \
-    jq -r '.[0].text.runs[0].navigationEndpoint.watchEndpoint.videoId')
-song=$(echo "$songdata" | jq -r '.[0].text.runs[0].text')
-artist=$(echo "$songdata" | jq -r '.[1].text.runs[2].text')
+    videoid=$(
+        jq -r \
+            '.[0].text.runs[0].navigationEndpoint.watchEndpoint.videoId' \
+            <<<"$items"
+    )
+
+    song=$(jq -r '.[0].text.runs[0].text' <<<"$items")
+    artist=$(jq -r '.[1].text.runs[2].text' <<<"$items")
+fi
 
 url="https://music.youtube.com/watch?v=$videoid"
+
+# Show the resolved track before downloading.
+echo "$url"
 echo "$artist - $song"
 
+# Download the selected track.
 ytm "$url"
