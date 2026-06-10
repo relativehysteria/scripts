@@ -1,0 +1,65 @@
+#!/bin/sh
+
+json=$(curl --silent 'https://www.youtube.com/youtubei/v1/search' \
+  --compressed \
+  -X POST \
+  -H 'User-Agent: Mozilla/5.0' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw "$(jq -c -n \
+    --arg query "$1" \
+    --arg date "$(date +%Y%m01)" \
+    '{
+      context: {
+        client: {
+          clientName: "WEB_REMIX",
+          clientVersion: ("1." + $date + ".00.00")
+        }
+      },
+      query: $query,
+    }'
+  )")
+
+songdata=$(echo "$json" | jq '
+[
+    .contents
+    .tabbedSearchResultsRenderer
+    .tabs[0]
+    .tabRenderer
+    .content
+    .sectionListRenderer
+    .contents
+    | map(
+        select(
+            .itemSectionRenderer
+            .contents[0]
+            .musicResponsiveListItemRenderer?
+            .overlay?
+            .musicItemThumbnailOverlayRenderer?
+            .content?
+            .musicPlayButtonRenderer?
+            .playNavigationEndpoint?
+            .watchEndpoint?
+            .watchEndpointMusicSupportedConfigs?
+            .watchEndpointMusicConfig?
+            .musicVideoType == "MUSIC_VIDEO_TYPE_ATV"
+        )
+    )
+    .[]
+    .itemSectionRenderer
+    .contents[]
+    .musicResponsiveListItemRenderer
+    .flexColumns[]
+    .musicResponsiveListItemFlexColumnRenderer
+]
+')
+
+videoid=$(echo "$songdata" | \
+    jq -r '.[0].text.runs[0].navigationEndpoint.watchEndpoint.videoId')
+song=$(echo "$songdata" | jq -r '.[0].text.runs[0].text')
+artist=$(echo "$songdata" | jq -r '.[1].text.runs[2].text')
+
+url="https://music.youtube.com/watch?v=$videoid"
+echo "$artist - $song"
+
+ytm "$url"
