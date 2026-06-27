@@ -49,7 +49,7 @@ json=$(curl 'https://music.youtube.com/youtubei/v1/browse' \
   -H 'Content-Type: application/json' \
   --data-raw "$(jq -c -n \
       --arg date "$(date +%Y%m01)" \
-      --arg channel_id "MPADUC$channel_id"  \
+      --arg browse_id "UC$channel_id"  \
     '{
         "context": {
             "client": {
@@ -57,7 +57,7 @@ json=$(curl 'https://music.youtube.com/youtubei/v1/browse' \
                 "clientVersion": ("1." + $date + ".00.00")
             }
         },
-        "browseId": $channel_id
+        "browseId": $browse_id
     }'
 )")
 
@@ -72,7 +72,7 @@ artist=$(printf '%s' "$artist" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\$/\\\$/g')
 echo "$json" > /tmp/json
 
 # Get the required fields and only keep EPs and albums
-listing=$(echo $json | jq '
+listing=$(echo "$json" | jq '
     .contents
     .singleColumnBrowseResultsRenderer
     .tabs[0]
