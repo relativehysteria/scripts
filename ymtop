@@ -1,0 +1,95 @@
+#!/bin/sh
+
+main_url="$1"
+
+# TODO: Do not use channel ID, but search for a term
+
+# Get the channel ID.
+channel_id=$(basename "$main_url")
+
+# Make sure that we got the correct channel ID.
+# Technically `wc -c` should be better here, but this is more future proof.
+if echo $channel_id | grep -q "://"; then
+    echo "Not a channel url"
+    exit
+fi
+
+# Get the channel metadata.
+json=$(curl --silent 'https://music.youtube.com/youtubei/v1/browse' \
+  --compressed \
+  -X POST \
+  -H 'User-Agent: Mozilla/5.0' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw "$(jq -c -n \
+      --arg date "$(date +%Y%m01)" \
+      --arg browse_id "$channel_id"  \
+    '{
+        "context": {
+            "client": {
+                "clientName": "WEB_REMIX",
+                "clientVersion": ("1." + $date + ".00.00")
+            }
+        },
+        "browseId": $browse_id
+    }'
+)")
+
+# Extract the top songs playlist ID.
+playlist_id=$(echo "$json" | jq -r '
+    .contents
+    .singleColumnBrowseResultsRenderer
+    .tabs[0]
+    .tabRenderer
+    .content
+    .sectionListRenderer
+    .contents[0]
+    .musicShelfRenderer
+    .contents[0]
+    .musicResponsiveListItemRenderer
+    .overlay
+    .musicItemThumbnailOverlayRenderer
+    .content
+    .musicPlayButtonRenderer
+    .playNavigationEndpoint
+    .watchEndpoint
+    .playlistId
+
+')
+
+# We have the playlist ID, scrape the song data!
+json=$(curl --silent 'https://music.youtube.com/youtubei/v1/next' \
+  --compressed \
+  -X POST \
+  -H 'User-Agent: Mozilla/5.0' \
+  -H 'Accept: application/json' \
+  -H 'Content-Type: application/json' \
+  --data-raw "$(jq -c -n \
+      --arg date "$(date +%Y%m01)" \
+      --arg playlist_id "$playlist_id"  \
+    '{
+        "context": {
+            "client": {
+                "clientName": "WEB_REMIX",
+                "clientVersion": ("1." + $date + ".00.00")
+            }
+        },
+        "playlistId": $playlist_id
+    }'
+)")
+
+echo $json | jq -r '
+    .contents
+    .singleColumnMusicWatchNextResultsRenderer
+    .tabbedRenderer
+    .watchNextTabbedResultsRenderer
+    .tabs[0]
+    .tabRenderer
+    .content
+    .musicQueueRenderer
+    .content
+    .playlistPanelRenderer
+    .contents[]
+    .playlistPanelVideoRenderer
+    | "\(.navigationEndpoint.watchEndpoint.videoId) | \(.title.runs[0].text)"
+'
