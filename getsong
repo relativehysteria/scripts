@@ -107,6 +107,7 @@ url="https://music.youtube.com/watch?v=$videoid"
 # Show the resolved track before downloading.
 echo "$url"
 echo "$artist - $song"
+sleep 1
 
 # Download the selected track.
-ytm "$url"
+ym "$artist" "$song" "$url"
