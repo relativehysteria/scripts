@@ -1,0 +1,16 @@
+#!/bin/sh
+
+[ "$1" = "" ] && exit
+
+title=$(echo "$1" | tr '/' ' ' | awk '{print $NF}')
+
+url=$(echo "$1" | sed 's/https:\/\/.*\/r\//https:\/\/reddit.com\/r\//')
+
+line=$(curl "https://rapidsave.com/info?url=$url" \
+    | grep "sd.rapidsave.com/download")
+
+url=$(echo $line | sed 's/.*href="//; s/"><i.*$//')
+
+output_format=$(echo "$url" | tr '.' ' ' | awk '{print $NF}')
+
+wget "$url" -O "$title.$output_format"
