@@ -49,7 +49,7 @@ json=$(curl 'https://music.youtube.com/youtubei/v1/browse' \
   -H 'Content-Type: application/json' \
   --data-raw "$(jq -c -n \
       --arg date "$(date +%Y%m01)" \
-      --arg browse_id "UC$channel_id"  \
+      --arg browse_id "MPADUC$channel_id"  \
     '{
         "context": {
             "client": {
@@ -61,6 +61,7 @@ json=$(curl 'https://music.youtube.com/youtubei/v1/browse' \
     }'
 )")
 
+
 # Get the channel/artist name. This will be used as the main artist tag for all
 # albums. The actual album artist (often different or featuring others) will go
 # in the composer tag. This keeps all albums grouped under one artist
@@ -68,8 +69,6 @@ json=$(curl 'https://music.youtube.com/youtubei/v1/browse' \
 artist="$(echo $json | jq -r '.header.musicHeaderRenderer.title.runs[0].text')"
 artist_regex=$(printf '%s' "$artist" | sed -e 's/[][\/.^$*+?{}()|"]/\\&/g')
 artist=$(printf '%s' "$artist" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\$/\\\$/g')
-
-echo "$json" > /tmp/json
 
 # Get the required fields and only keep EPs and albums
 listing=$(echo "$json" | jq '
@@ -89,7 +88,8 @@ listing=$(echo "$json" | jq '
         date: .subtitle.runs[2].text,
         uri: .navigationEndpoint.browseEndpoint.browseId | sub("^MPREb_"; ""),
     }
-    | select(.kind == "EP" or .kind == "Album")')
+    | select(.kind == "EP" or .kind == "Album")
+')
 
 # Extract the URIs
 uris_dates=$(echo $listing | jq -s '.[] | .uri + " " + .date')
