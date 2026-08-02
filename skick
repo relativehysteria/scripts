@@ -30,6 +30,7 @@ PREFERRED_LOCATIONS = {
 }
 
 ARTISTS = {
+    "304231-matt-elliott",
     "132580-swans",
     "201140-mono",
     "67042-zazen-boys",
