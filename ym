@@ -5,7 +5,7 @@ import re
 import os
 import fcntl
 from dataclasses import dataclass
-from typing import List, Tuple, Set
+from typing import List, Tuple, Set, Optional
 from os.path import expanduser, join, splitext
 from pathlib import Path
 from hashlib import sha256
@@ -144,8 +144,8 @@ class DirManager:
 
     # Scan the directory and return:
     # * A sorted list of existing IDs
-    # * A set of existing songs in lowercase
-    def get_directory_data(self) -> Tuple[List[int], Set[str]]:
+    # * A sorted list of existing songs in lowercase
+    def get_directory_data(self) -> Tuple[List[int], List[str]]:
         ids   = list()
         songs = set()
 
@@ -241,7 +241,7 @@ class DirManager:
             current_max_width = len(str(ids[-1]))
             new_max_width     = max(current_max_width, len(str(new_id)))
             if ids and current_max_width < new_max_width:
-                self.normalize_filenames(new_width)
+                self.normalize_filenames(new_max_width)
 
             # Construct the final file path and create the output file
             file_name = f"{new_id:0{new_max_width}} {args.song}.mp3"
