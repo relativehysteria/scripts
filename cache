@@ -1,0 +1,37 @@
+#!/bin/sh
+
+# A wrapper that caches the output of commands. When the command is called
+# again with the same arguments, the cached output is returned instead of
+# actually running the command.
+
+if [ "$#" -eq 0 ]; then
+    echo "Usage: $0 <cmd> [args...]"
+    exit 1
+fi
+
+cmd="$1"
+shift
+
+cache_dir="${XDG_DATA_HOME:-$HOME/.local/share}/cmd-cache/$cmd"
+mkdir -p "$cache_dir" || exit 1
+
+hashed=$(printf '%s\0' "$@" | sha1sum | awk '{print $1}')
+cached_file="$cache_dir/$hashed"
+
+if [ -f "$cached_file" ]; then
+    cat "$cached_file"
+    exit 0
+fi
+
+tmp_file=$(mktemp "$cache_dir/.tmp.XXXXXX") || exit 1
+
+if "$cmd" "$@" > "$tmp_file"; then
+    mv "$tmp_file" "$cached_file"
+    cat "$cached_file"
+    exit 0
+else
+    status=$?
+    cat "$tmp_file"
+    rm -f "$tmp_file"
+    exit "$status"
+fi
