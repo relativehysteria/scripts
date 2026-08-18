@@ -1,9 +1,9 @@
-#!/bin/sh
-
 MUSIC_ROOT="$HOME/music"
 
 usage() {
-    echo "Usage: $0 -u <url> -a <artist> -l <album> [-d <date>] [-m]"
+    echo "Usage: $0" \
+        "-u <url> -a <artist> -l <album>" \
+        "[-d <date>] [-m] [-c <cookie_file>]"
     echo
     echo "    Downloads a playlist/album/EP/whatever from a URL"
     echo
@@ -12,6 +12,7 @@ usage() {
     echo "    -l    Album name"
     echo "    -d    Release date (optional)"
     echo "    -m    Download as .mp3"
+    echo "    -c    Cookies file that will be passed to yt-dlp"
     exit 1
 }
 
@@ -19,14 +20,17 @@ url=""
 artist=""
 album=""
 date=""
+cookies=""
+mp3=""
 
-while getopts "u:a:l:d:m:" opt; do
+while getopts "u:a:l:d:mc:" opt; do
     case "$opt" in
         u) url="$OPTARG" ;;
         a) artist="$OPTARG" ;;
         l) album="$OPTARG" ;;
         d) date="$OPTARG" ;;
-        m) mp3="--audio-format mp3" ;;
+        m) mp3="yes" ;;
+        c) cookies="$OPTARG" ;;
         *) usage ;;
     esac
 done
@@ -35,14 +39,21 @@ done
 [ -z "$artist" ] && usage
 [ -z "$album" ] && usage
 
-echo $date
-exit
+set --
+
+if [ -n "$cookies" ]; then
+    set -- "$@" --cookies "$cookies"
+fi
+
+if [ -n "$mp3" ]; then
+    set -- "$@" --audio-format mp3
+fi
 
 # Escape values for use in yt-dlp's metadata replacement expressions.
 artist_regex=$(printf '%s' "$artist" | sed -e 's/[][\/.^$*+?{}()|"]/\\&/g')
 artist=$(printf '%s' "$artist" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\$/\\\$/g')
 
-yt-dlp -x $mp3 --embed-metadata \
+yt-dlp "$@" -x --embed-metadata \
     -o "$MUSIC_ROOT/%(artist)s/%(album)s/%(playlist_index)s %(title)s.%(ext)s" \
     --parse-metadata ":(?P<meta_description>)" \
     --parse-metadata ":(?P<meta_synopsis>)" \
