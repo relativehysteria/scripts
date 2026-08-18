@@ -15,7 +15,7 @@ print_help() {
 [ "$main_url" = "" ] && print_help && exit
 
 # Get the contents of the album page
-album_contents=$(curl "$main_url")
+album_contents=$(curl --silent "$main_url")
 
 # Get the track metadata
 meta=$(echo "$album_contents" | grep -i '.*<title>.*</title>.*')
@@ -33,11 +33,13 @@ artist=$(echo "$artist" | sed -e 's/"/\\"/g' -e 's/\//_/g')
 
 # Get the release date
 date=$(echo "$album_contents" | grep -ix "\s*released.*")
-date=$(echo "$date" | sed -e "s/^.*released //g")
+date=$(echo "$date" | sed -e "s/^.*released //g" -e "s/\s*released\s*//g")
+date=$(echo "$date" | sed -n 's/.*\([0-9]\{4\}\)$/\1/p')
 
 # Echo the data
 echo "artist=\"$artist\""
-echo "album=\"$title\"  # $date"
+echo "album=\"$title\""
+echo "date=\"$date\""
 echo "url='$main_url'"
-echo 'musicdl -u "$url" -a "$artist" -l "$album"'
+echo 'musicdl -u "$url" -a "$artist" -l "$album" -d "$date"'
 echo

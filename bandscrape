@@ -19,7 +19,7 @@ print_help() {
 root_url="$(echo $main_url | sed -e 's/\(http.*bandcamp.com\).*/\1/g')"
 
 # Get the contents of the music section
-music_section_contents=$(curl "$root_url/music")
+music_section_contents=$(curl --silent "$root_url/music")
 
 # Get urls to albums/ep's
 album_urls=$(echo "$music_section_contents" | grep '/album/')

@@ -1,29 +1,58 @@
 #!/bin/sh
 
-MUSICROOT="$HOME/music"
+MUSIC_ROOT="$HOME/music"
 
-# Useful as shit
 usage() {
-    echo "Usage: $0 <-u url> [-a author] [-l album] [-m]"
-    exit
+    echo "Usage: $0 -u <url> -a <artist> -l <album> [-d <date>] [-m]"
+    echo
+    echo "    Downloads a playlist/album/EP/whatever from a URL"
+    echo
+    echo "    -u    Complete YouTube Music album URL"
+    echo "    -a    Artist name"
+    echo "    -l    Album name"
+    echo "    -d    Release date (optional)"
+    echo "    -m    Download as .mp3"
+    exit 1
 }
 
 url=""
-author=""
+artist=""
 album=""
-mp3=""
+date=""
 
-# Get the arguments
-while getopts "hu:a:l:m" opt; do
+while getopts "u:a:l:d:m:" opt; do
     case "$opt" in
-        h) usage;;
-        u) url="$OPTARG";;
-        a) author="$OPTARG";;
-        l) album="$OPTARG";;
-        m) mp3="--audio-format mp3"
+        u) url="$OPTARG" ;;
+        a) artist="$OPTARG" ;;
+        l) album="$OPTARG" ;;
+        d) date="$OPTARG" ;;
+        m) mp3="--audio-format mp3" ;;
+        *) usage ;;
     esac
 done
 
-[ "$url" = "" ] && usage
+[ -z "$url" ] && usage
+[ -z "$artist" ] && usage
+[ -z "$album" ] && usage
 
-yt-dlp -x $mp3 -o "$MUSICROOT/$author/$album/%(playlist_index)s %(title)s.%(ext)s" "$url"
+echo $date
+exit
+
+# Escape values for use in yt-dlp's metadata replacement expressions.
+artist_regex=$(printf '%s' "$artist" | sed -e 's/[][\/.^$*+?{}()|"]/\\&/g')
+artist=$(printf '%s' "$artist" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\$/\\\$/g')
+
+yt-dlp -x $mp3 --embed-metadata \
+    -o "$MUSIC_ROOT/%(artist)s/%(album)s/%(playlist_index)s %(title)s.%(ext)s" \
+    --parse-metadata ":(?P<meta_description>)" \
+    --parse-metadata ":(?P<meta_synopsis>)" \
+    --parse-metadata ":(?P<meta_purl>)" \
+    --parse-metadata "playlist_index:%(meta_track)s" \
+    --parse-metadata "playlist_title:(?:Album - )?(?P<album>.+)" \
+    --parse-metadata "$date:%(meta_date)s" \
+    --parse-metadata "artist:%(composer)s" \
+    --replace-in-metadata "artist" "^.*$" "$artist" \
+    --replace-in-metadata "album" "^.*$" "$album" \
+    --replace-in-metadata "composer" "(?i)$artist_regex(?:, )?" "" \
+    --replace-in-metadata "composer" ", *$" "" \
+    "$url"

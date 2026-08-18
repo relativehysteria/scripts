@@ -96,32 +96,16 @@ uris_dates=$(echo $listing | jq -s '.[] | .uri + " " + .date')
 
 echo '#!/bin/sh'
 echo
-echo 'MUSIC_ROOT="$HOME/music"'
-echo
-echo 'download() {'
-echo '    url="https://music.youtube.com/browse/MPREb_$1"'
-echo '    date="$2"'
-echo
-echo '    yt-dlp -x --audio-format mp3 --embed-metadata \'
-echo '        -o "$MUSIC_ROOT/%(artist)s/%(album)s/%(playlist_index)s %(title)s.%(ext)s" \'
-echo '        --parse-metadata ":(?P<meta_description>)" \'
-echo '        --parse-metadata ":(?P<meta_synopsis>)" \'
-echo '        --parse-metadata ":(?P<meta_purl>)" \'
-echo '        --parse-metadata "playlist_index:%(meta_track)s" \'
-echo '        --parse-metadata "playlist_title:(?:Album - )?(?P<album>.+)" \'
-echo '        --parse-metadata "$date:%(meta_date)s" \'
-echo '        --parse-metadata "artist:%(composer)s" \'
-echo "        --replace-in-metadata \"artist\" \"^.*$\" \"$artist\" \\"
-echo "        --replace-in-metadata \"composer\" \"(?i)$artist_regex(?:, )?\" \"\" \\"
-echo "        --replace-in-metadata \"composer\" \", *$\" \"\" \\"
-echo '        "$url"'
-echo '}'
+echo "artist='$artist'"
 echo
 echo 'while IFS= read -r line; do'
 echo '    IFS="│"; set -- $(printf "%s\n" "$line")'
 echo '    ident=$(echo "$1" | sed -e "s/^ *//; s/ *$//")'
 echo '    date=$(echo "$2" | sed -e "s/^ *//; s/ *$//")'
-echo '    download "$ident" "$date" &'
+echo '    album=$(echo "$4" | sed -e "s/^ *//; s/ *$//")'
+echo '    url="https://music.youtube.com/browse/MPREb_$ident"'
+echo
+echo '    musicdl -u "$url" -a "$artist" -l "$album" -d "$date" -m &'
 echo 'done << ───────────────────┤'
 echo "$listing" | jq -s -r '.[] | .uri + " │ " + .date + " │ " + (.kind | if . == "EP" then "EP   " else . end) + " │ " + .title'
 echo '───────────────────┤'
