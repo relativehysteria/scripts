@@ -54,7 +54,7 @@ artist_regex=$(printf '%s' "$artist" | sed -e 's/[][\/.^$*+?{}()|"]/\\&/g')
 artist=$(printf '%s' "$artist" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\$/\\\$/g')
 
 yt-dlp "$@" -x --embed-metadata \
-    -o "$MUSIC_ROOT/%(artist)s/%(album)s/%(playlist_index)s %(title)s.%(ext)s" \
+    -o "$MUSIC_ROOT/$artist/$album/%(playlist_index)s %(title)s.%(ext)s" \
     --parse-metadata ":(?P<meta_description>)" \
     --parse-metadata ":(?P<meta_synopsis>)" \
     --parse-metadata ":(?P<meta_purl>)" \
