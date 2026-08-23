@@ -35,6 +35,9 @@ COMMANDS = {
     "volume_original": [
         "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", str(INITIAL_VOLUME)
     ],
+    "next_song": [
+        "mpc", "next",
+    ],
 }
 
 class Handler(BaseHTTPRequestHandler):
