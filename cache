@@ -4,34 +4,127 @@
 # again with the same arguments, the cached output is returned instead of
 # actually running the command.
 
-if [ "$#" -eq 0 ]; then
-    echo "Usage: $0 <cmd> [args...]"
+usage() {
+    echo "Usage: $0 [-t <lifetime>] <cmd> [args...]"
+    echo
+    echo "    -t    Time (in seconds) for how long this cache entry is valid."
     exit 1
-fi
+}
 
-cmd="$1"
-shift
+# Print cached output, excluding the metadata header.
+print_cache() {
+    sed '1,3d' "$cached_file"
+}
 
-cache_dir="${XDG_DATA_HOME:-$HOME/.local/share}/cmd-cache/$cmd"
-mkdir -p "$cache_dir" || exit 1
+# Write the cache header and existing command output.
+write_cache() {
+    {
+        printf '%s\n' "$lifetime"
+        printf '%s' "$cmd"
+        for arg in "$@"
+        do
+            printf ' %s' "$arg"
+        done
+        printf '\n'
+        printf '%s\n' '------------------'
+        sed '1,3d' "$cached_file"
+    } > "$cached_file.tmp"
 
-hashed=$(printf '%s\0' "$@" | sha1sum | awk '{print $1}')
-cached_file="$cache_dir/$hashed"
+    mv "$cached_file.tmp" "$cached_file"
+}
 
-if [ -f "$cached_file" ]; then
-    cat "$cached_file"
-    exit 0
-fi
+# Check whether an existing cache entry can be used.
+#
+# A lifetime of 0 means permanent. If a new lifetime was requested,
+# update the metadata without rerunning the command.
+use_cache() {
+    cached_lifetime=$(sed -n '1p' "$cached_file")
 
-tmp_file=$(mktemp "$cache_dir/.tmp.XXXXXX") || exit 1
+    if [ "$cached_lifetime" -eq 0 ]; then
+        if [ "$lifetime" -ne 0 ]; then
+            write_cache "$@"
+        fi
+        print_cache
+        return 0
+    fi
 
-if "$cmd" "$@" > "$tmp_file"; then
-    mv "$tmp_file" "$cached_file"
-    cat "$cached_file"
-    exit 0
-else
+    now=$(date +%s)
+    created=$(stat -c '%Y' "$cached_file")
+
+    if [ $((now - created)) -lt "$cached_lifetime" ]; then
+        print_cache
+        return 0
+    fi
+
+    return 1
+}
+
+# Run the command and atomically create the cache entry on success.
+run_command() {
+    tmp_file=$(mktemp "$cache_dir/.tmp.XXXXXX") || exit 1
+
+    if "$cmd" "$@" > "$tmp_file"; then
+        {
+            printf '%s\n' "$lifetime"
+            printf '%s' "$cmd"
+            for arg in "$@"
+            do
+                printf ' %s' "$arg"
+            done
+            printf '\n'
+            printf '%s\n' '------------------'
+            cat "$tmp_file"
+        } > "$tmp_file.cache"
+
+        mv "$tmp_file.cache" "$cached_file"
+        rm -f "$tmp_file"
+
+        print_cache
+        exit 0
+    fi
+
     status=$?
     cat "$tmp_file"
     rm -f "$tmp_file"
     exit "$status"
+}
+
+[ "$#" -gt 0 ] || usage
+
+lifetime="0"
+
+# Parse only this wrapper's options; everything after the command is untouched.
+while getopts "t:" opt
+do
+    case "$opt" in
+        t)
+            lifetime=$OPTARG
+            ;;
+        \?)
+            usage
+            ;;
+    esac
+done
+shift $((OPTIND - 1))
+
+[ "$#" -gt 0 ] || usage
+
+cmd="$1"
+shift
+
+cmd_base=$(basename "$cmd")
+cache_dir="${XDG_DATA_HOME:-$HOME/.local/share}/cmd-cache/$cmd_base"
+mkdir -p "$cache_dir" || exit 1
+
+# Hash only the command arguments, preserving empty arguments.
+hashed=$(printf '%s\0' "$@" | sha1sum | awk '{print $1}')
+cached_file="$cache_dir/$hashed"
+
+>&2 echo "cached in $cached_file"
+
+# Use the cache if it is permanent or hasn't expired.
+if [ -f "$cached_file" ] && use_cache "$@"; then
+    exit 0
 fi
+
+run_command "$@"
