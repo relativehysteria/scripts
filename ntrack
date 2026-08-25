@@ -1,0 +1,47 @@
+#!/bin/sh
+
+# Show network data transferred since boot.
+
+find_default_interface() {
+    # /proc/net/route contains the routing table. The interface with
+    # destination 00000000 is the default route.
+    awk '$2 == "00000000" && $1 != "lo" { print $1; exit }' /proc/net/route
+}
+
+format_bytes() {
+    bytes=$1
+
+    if [ "$bytes" -ge 1073741824 ]; then
+        awk -v b="$bytes" 'BEGIN { printf "%.2f GiB", b / 1073741824 }'
+    elif [ "$bytes" -ge 1048576 ]; then
+        awk -v b="$bytes" 'BEGIN { printf "%.2f MiB", b / 1048576 }'
+    elif [ "$bytes" -ge 1024 ]; then
+        awk -v b="$bytes" 'BEGIN { printf "%.2f KiB", b / 1024 }'
+    else
+        printf '%s B' "$bytes"
+    fi
+}
+
+iface=${1:-$(find_default_interface)}
+
+if [ -z "$iface" ]; then
+    echo "Could not determine the default network interface." >&2
+    exit 1
+fi
+
+rx_file="/sys/class/net/$iface/statistics/rx_bytes"
+tx_file="/sys/class/net/$iface/statistics/tx_bytes"
+
+if [ ! -r "$rx_file" ] || [ ! -r "$tx_file" ]; then
+    echo "Cannot read statistics for interface: $iface" >&2
+    exit 1
+fi
+
+rx=$(cat "$rx_file")
+tx=$(cat "$tx_file")
+total=$((rx + tx))
+
+printf 'Interface:   %s\n' "$iface"
+printf 'Received:    %s\n' "$(format_bytes "$rx")"
+printf 'Transmitted: %s\n' "$(format_bytes "$tx")"
+printf 'Total:       %s\n' "$(format_bytes "$total")"
