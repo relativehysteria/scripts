@@ -8,6 +8,7 @@ usage() {
     echo "Usage: $0 [-t <lifetime>] <cmd> [args...]"
     echo
     echo "    -t    Time (in seconds) for how long this cache entry is valid."
+    echo "    -r    Invalidate the entry and re-cache the command."
     exit 1
 }
 
@@ -92,17 +93,14 @@ run_command() {
 [ "$#" -gt 0 ] || usage
 
 lifetime="0"
+recache="0"
 
 # Parse only this wrapper's options; everything after the command is untouched.
-while getopts "t:" opt
+while getopts "rt:" opt
 do
     case "$opt" in
-        t)
-            lifetime=$OPTARG
-            ;;
-        \?)
-            usage
-            ;;
+        t) lifetime=$OPTARG ;;
+        r) recache="1" ;;
     esac
 done
 shift $((OPTIND - 1))
@@ -120,7 +118,13 @@ mkdir -p "$cache_dir" || exit 1
 hashed=$(printf '%s\0' "$@" | sha1sum | awk '{print $1}')
 cached_file="$cache_dir/$hashed"
 
->&2 echo "cached in $cached_file"
+# Invalidate the entry first if we were told so.
+if [ "$recache" -eq 1 ]; then
+    >&2 echo "Re-caching into $cached_file"
+    rm "$cached_file"
+else
+    >&2 echo "Caching into $cached_file"
+fi
 
 # Use the cache if it is permanent or hasn't expired.
 if [ -f "$cached_file" ] && use_cache "$@"; then
