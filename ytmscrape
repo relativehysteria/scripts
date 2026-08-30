@@ -1,7 +1,5 @@
 #!/bin/sh
 
-main_url="$1"
-
 # Help message
 print_help() {
     echo "Usage: $0 <youtube_music_channel_url>"
@@ -26,19 +24,23 @@ print_help() {
     echo "    ./download_albums.sh; wait"
 }
 
-# Check that a url was provided
-[ "$main_url" = "" ] && print_help && exit
+channel_id="$1"
 
-# Get the channel ID
-channel_id=$(basename "$main_url")
+# Check that an ID was provided
+[ "$channel_id" = "" ] && print_help && exit
+
+# Extract the ID; either the full channel url was provided, or an ID that still
+# has to be extracted.
+case "$channel_id" in
+    *"://"*)
+        channel_id=$(basename "$channel_id")
+        ;;
+    *)
+        channel_id=$(ytid "$channel_id" | sed '1!d')
+        ;;
+esac
+
 channel_id="${channel_id#??}"
-
-# Make sure that we got the correct channel ID.
-# Technically `wc -c` should be better here, but this is more future proof
-if echo $channel_id | grep -q "://"; then
-    echo "Not a channel url"
-    exit
-fi
 
 # Get the discography listing
 json=$(curl 'https://music.youtube.com/youtubei/v1/browse' \
