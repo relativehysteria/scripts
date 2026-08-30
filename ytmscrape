@@ -113,3 +113,4 @@ echo "$listing" | jq -s -r '.[] | .uri + " │ " + .date + " │ " + (.kind | if
 echo '───────────────────┤'
 echo '# PICK YOUR POISON │'
 echo '#──────────────────┘'
+echo 'wait'
