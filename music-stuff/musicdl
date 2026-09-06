@@ -1,0 +1,70 @@
+#!/bin/sh
+MUSIC_ROOT="$HOME/music"
+
+usage() {
+    echo "Usage: $0" \
+        "-u <url> -a <artist> -l <album>" \
+        "[-d <date>] [-m] [-c <cookie_file>]"
+    echo
+    echo "    Downloads a playlist/album/EP/whatever from a URL"
+    echo
+    echo "    -u    Complete YouTube Music album URL"
+    echo "    -a    Artist name"
+    echo "    -l    Album name"
+    echo "    -d    Release date (optional)"
+    echo "    -m    Download as .mp3"
+    echo "    -c    Cookies file that will be passed to yt-dlp"
+    exit 1
+}
+
+url=""
+artist=""
+album=""
+date=""
+cookies=""
+mp3=""
+
+while getopts "u:a:l:d:mc:" opt; do
+    case "$opt" in
+        u) url="$OPTARG" ;;
+        a) artist="$OPTARG" ;;
+        l) album="$OPTARG" ;;
+        d) date="$OPTARG" ;;
+        m) mp3="yes" ;;
+        c) cookies="$OPTARG" ;;
+        *) usage ;;
+    esac
+done
+
+[ -z "$url" ] && usage
+[ -z "$artist" ] && usage
+[ -z "$album" ] && usage
+
+set --
+
+if [ -n "$cookies" ]; then
+    set -- "$@" --cookies "$cookies"
+fi
+
+if [ -n "$mp3" ]; then
+    set -- "$@" --audio-format mp3
+fi
+
+# Escape values for use in yt-dlp's metadata replacement expressions.
+artist_regex=$(printf '%s' "$artist" | sed -e 's/[][\/.^$*+?{}()|"]/\\&/g')
+artist=$(printf '%s' "$artist" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\$/\\\$/g')
+
+yt-dlp "$@" -x --embed-metadata \
+    -o "$MUSIC_ROOT/$artist/$album/%(playlist_index)s %(title)s.%(ext)s" \
+    --parse-metadata ":(?P<meta_description>)" \
+    --parse-metadata ":(?P<meta_synopsis>)" \
+    --parse-metadata ":(?P<meta_purl>)" \
+    --parse-metadata "playlist_index:%(meta_track)s" \
+    --parse-metadata "playlist_title:(?:Album - )?(?P<album>.+)" \
+    --parse-metadata "$date:%(meta_date)s" \
+    --parse-metadata "artist:%(composer)s" \
+    --replace-in-metadata "artist" "^.*$" "$artist" \
+    --replace-in-metadata "album" "^.*$" "$album" \
+    --replace-in-metadata "composer" "(?i)$artist_regex(?:, )?" "" \
+    --replace-in-metadata "composer" ", *$" "" \
+    "$url"

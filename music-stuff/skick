@@ -1,0 +1,192 @@
+#!/usr/bin/env python
+
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Optional
+from datetime import datetime, date
+from concurrent.futures import ThreadPoolExecutor
+from bs4 import BeautifulSoup
+from requests import get
+
+# ANSI colors
+RESET   = "\033[0m"
+CYAN    = "\033[36m"
+RED     = "\033[31m"
+YELLOW  = "\033[33m"
+MAGENTA = "\033[35m"
+DIM     = "\033[2m"
+UNDER   = "\033[4m"
+
+PREFERRED_LOCATIONS = {
+    f"{UNDER}{RED}": {
+        "Czech Republic",
+        "Slovakia"
+    },
+    f"{YELLOW}": {
+        "Poland",
+        "Germany",
+        "Austria"
+    },
+}
+
+ARTISTS = {
+    "3822376-phoebe-bridgers",
+    "304231-matt-elliott",
+    "132580-swans",
+    "201140-mono",
+    "67042-zazen-boys",
+    "559-giraffes-giraffes",
+    "438069-seefeel",
+    "109314-caroline",
+    "134405-shame",
+    "10390101-my-new-band-believe",
+    "1352869-idles",
+    "70202-mogwai",
+    "221050-cardinals",
+    "9352489-remember-sports",
+    "9405704-belair-lip-bombs",
+    "8990889-soccer-mommy",
+    "9563889-indigo-de-souza",
+    "9685174-chanel-beads",
+    "9993914-lowertown",
+    "7680934-forth-wanderers",
+    "4561218-a-winged-victory-for-the-sullen",
+    "182957-godspeed-you-black-emperor",
+    "9613464-soot-sprite",
+    "369590-los-campesinos",
+    "8403918-klangstof",
+    "253846-radiohead",
+    "220083-thom-yorke",
+    "10355080-westside-cowboy",
+    "5607023-ratboys",
+    "3768296-rum-jungle",
+    "590705-bon-iver",
+    "4126816-wolf-alice",
+    "9329894-queens-pleasure",
+    "5806184-jeff-rosenstock",
+    "605621-tom-rosenthal",
+    "10098289-ichiko-aoba",
+    "383629-balthazar",
+    "496602-sigur-ros",
+    "1167694-shakey-graves",
+    "590465-olafur-arnalds",
+    "715080-warpaint",
+    "542593-jose-gonzalez",
+    "592267-fleet-foxes",
+    "113970-iron-and-wine",
+    "7858599-rainbow-kitten-surprise",
+    "9582179-momma",
+    "9693119-black-country-new-road",
+    "9278794-black-midi",
+    "10341381-geordie-greep",
+    "535518-modest-mouse",
+    "118509-sufjan-stevens",
+    "277989-sunny-day-real-estate",
+    "385433-hum",
+    "1706007-pygmy-lush",
+    "421785-toe",
+    "1667252-enumclaw",
+    "10370116-racing-mount-pleasant",
+    "8663139-haley-heynderickx",
+    "2739046-mouse-on-the-keys",
+    "464566-do-make-say-think",
+    "9377124-sorry",
+    "10234682-new-eves",
+    "425997-kilimanjaro-darkjazz-ensemble",
+}
+
+BASE_URL = "https://www.songkick.com"
+
+@dataclass
+class Concert:
+    band: str
+    date: date
+    venue: str
+    location: str
+
+    @staticmethod
+    def _get_soup(url: str) -> Optional[BeautifulSoup]:
+        headers = { "User-Agent": "" }
+        try:
+            r = get(url, headers=headers)
+            r.raise_for_status()
+            return BeautifulSoup(r.text, features="lxml")
+        except Exception as e:
+            print(e)
+            return None
+
+    @classmethod
+    def get_nearest(cls, soup: BeautifulSoup) -> Optional[str]:
+        # Bail out if the band is not touring
+        if soup.find("div", class_="off-tour-button") is not None:
+            return None
+
+        # Get the nearest concert link
+        nearest = soup.find("a", class_="see-nearest-concert-link")
+        if not nearest or not nearest.get("href"):
+            return None
+
+        # Get and return the soup for this concert
+        return cls._get_soup(f"{BASE_URL}/{nearest['href']}")
+
+    @classmethod
+    def from_artist_code(cls, code: str) -> Optional[Concert]:
+        # Get the calendar page
+        soup = cls._get_soup(f"{BASE_URL}/artists/{code}/calendar")
+        if soup is None:
+            return
+
+        # Get the nearest concert
+        nearest = Concert.get_nearest(soup)
+        if nearest is None:
+            return
+
+        # Get the name
+        name = soup.find("h1", class_="title-copy").text.split(" tour date")[-2]
+
+        # Get the concert date, location and venue
+        loc_txt  = nearest.find_all("span", class_="venue-text")
+        date     = nearest.find("div", class_="event-date").text.strip()
+        venue    = loc_txt[0].text.strip()
+        location = loc_txt[1].find_all("span")[-1].text.strip()
+
+        # For multiday festivals, use the start of the festival as the date and
+        # parse it as a date object
+        date = date.split(' – ')[0]
+        date = datetime.strptime(date, "%A %d %B %Y").date()
+
+        return cls(name, date, venue, location)
+
+
+def get_location_color(target_location, default_color=f"{YELLOW}{DIM}"):
+    # Clean the target input for a fair comparison
+    target_clean = target_location.strip().lower()
+
+    for color, locations in PREFERRED_LOCATIONS.items():
+        # Check against lowercase versions of the locations
+        if any(target_clean.endswith(loc.lower()) for loc in locations):
+            return color
+
+    return default_color
+
+
+if __name__ == "__main__":
+    # Scrape everything in parallel
+    pool = ThreadPoolExecutor(max_workers=len(ARTISTS))
+    concerts = [i for i in pool.map(Concert.from_artist_code, ARTISTS)
+                if i and i.date >= datetime.today().date()]
+
+    # Sort the concerts by their date
+    concerts.sort(key=lambda concert: concert.date)
+
+    end = f" {YELLOW}┆ "
+
+    # Print the concerts out
+    for c in concerts:
+        location_color = get_location_color(c.location)
+        print(f"{location_color}{c.date.isoformat()}{RESET}", end=end)
+        print(f"{RESET}{c.band}", end=end)
+        print(f"{MAGENTA}{c.location}", end=end)
+        print(f"{CYAN}{c.venue}")
+
+    print(f"{RESET}", end='')
