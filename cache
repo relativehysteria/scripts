@@ -121,7 +121,7 @@ cached_file="$cache_dir/$hashed"
 # Invalidate the entry first if we were told so.
 if [ "$recache" -eq 1 ]; then
     >&2 echo "Re-caching into $cached_file"
-    rm "$cached_file"
+    rm -f "$cached_file"
 else
     >&2 echo "Caching into $cached_file"
 fi
