@@ -1,0 +1,100 @@
+#!/usr/bin/env python
+
+from bs4 import BeautifulSoup
+import requests
+import sys
+from urllib.parse import quote
+
+# I'm just sitting here looking at pretty colors.
+class Ansi:
+    RESET = "\033[0m"
+
+    BLACK = "\033[30m"
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+    MAGENTA = "\033[35m"
+    CYAN = "\033[36m"
+    WHITE = "\033[37m"
+
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    ITALIC = "\033[3m"
+
+    @classmethod
+    def wrap(cls, text: str, *styles: str) -> str:
+        return f"{''.join(styles)}{text}{cls.RESET}"
+
+    @classmethod
+    def speech_part(cls, text: str) -> str:
+        CLR_ADJ  = cls.YELLOW
+        CLR_PRON = cls.CYAN
+        CLR_VERB = cls.GREEN
+        CLR_NOUN = cls.MAGENTA
+        CLR_REST = cls.BLUE
+
+        text = text.split('.')
+        part = text[0]
+
+        if part.startswith("adj"):
+            part = cls.wrap(part, CLR_ADJ)
+        elif part.startswith("pron"):
+            part = cls.wrap(part, CLR_PRON)
+        elif part.startswith("v"):
+            part = cls.wrap(part, CLR_VERB)
+        elif part.startswith("n"):
+            part = cls.wrap(part, CLR_NOUN)
+        else:
+            part = cls.wrap(part, CLR_REST)
+
+        text[0] = part
+        return f"({'.'.join(text)})"
+
+
+def main():
+    # Make sure we have enough args.
+    if len(sys.argv) != 2:
+        print(f"Usage: {sys.argv[0]} <word>")
+        exit(1)
+
+    # Fetch the page.
+    url = f"https://www.etymonline.com/word/{quote(sys.argv[1])}"
+    res = requests.get(url)
+    res.raise_for_status()
+
+    # Parse the HTML.
+    soup = BeautifulSoup(res.text, features="lxml")
+
+    # Get the word definition divs.
+    divs = soup.select_one(".bg-white.rounded-lg.lg\\:shadow-sm").div
+
+    # Go through each of the definitions.
+    for word_def in divs.children:
+        # If there's no section, there's no definition.
+        if word_def.section is None:
+            print("No definition.")
+            exit(0)
+
+        # Parse the title of the word as well as its part of speech.
+        title_section = word_def.section.h2.children
+        title = next(title_section).text
+        speech_part = next(title_section).text.strip("()")
+
+        # Parse the etymological description of this word.
+        # There may be multiple paragraphs.
+        definition = [
+            section.text.strip().replace("\n\n", "\n")
+            for section in word_def.section.section.children
+            if section.text.strip()
+        ]
+
+        # Print out the definitions!
+        print(Ansi.wrap(title, Ansi.BOLD, Ansi.YELLOW), end=" ")
+        print(Ansi.speech_part(speech_part))
+        for part in definition[:-1]:
+            print(f"   {Ansi.wrap('├', Ansi.YELLOW)} {part}")
+        print(f"   {Ansi.wrap('└', Ansi.YELLOW)} {definition[-1]}\n")
+
+if __name__ == "__main__":
+    main()
