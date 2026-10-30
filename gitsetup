@@ -15,151 +15,111 @@ die() {
 command -v git >/dev/null 2>&1 || die "git is required"
 command -v gpg >/dev/null 2>&1 || die "gpg is required"
 
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 ||
+repo=$(git rev-parse --show-toplevel 2>/dev/null) ||
     die "run inside a Git working tree"
 
-# GitHub identity: intentionally independent of the GPG UID. Use the
-# repository's existing identity as defaults, if configured.
-github_name=$(git config --local --get user.name 2>/dev/null || :)
-github_email=$(git config --local --get user.email 2>/dev/null || :)
-
-printf 'GitHub author name [%s]: ' "$github_name"
-IFS= read -r answer || die "could not read author name"
-[ -z "$answer" ] || github_name=$answer
-
-printf 'GitHub author email [%s]: ' "$github_email"
-IFS= read -r answer || die "could not read author email"
-[ -z "$answer" ] || github_email=$answer
-
-[ -n "$github_name" ] || die "author name is required"
-[ -n "$github_email" ] || die "author email is required"
-
-
-repo=$(git rev-parse --show-toplevel)
-printf 'Repository: %s\n\n' "$repo"
-
-# Respect custom hooks directories rather than installing a hook
-# somewhere Git will not execute it.
+# This script installs the hook in Git's default hooks directory.
 if git config --get core.hooksPath >/dev/null 2>&1; then
-    die "core.hooksPath is configured; install the hook there manually"
+    die "core.hooksPath is configured; configure that hooks directory manually"
 fi
 
-hook=$(git rev-parse --git-path hooks/commit-msg)
+# Get primary secret-key fingerprints and their UIDs.
+key_data=$(gpg --batch --with-colons --fingerprint --list-secret-keys) ||
+    die "could not list GPG secret keys"
 
-# Permit replacement only when this script previously installed the hook.
-if [ -e "$hook" ] &&
-   ! grep -q '^# managed-by-gitsetup$' "$hook"; then
-    die "existing commit-msg hook will not be overwritten: $hook"
-fi
-
-tmp=$(mktemp "${TMPDIR:-/tmp}/gitsetup.XXXXXX") ||
-    die "cannot create temporary file"
-trap 'rm -f "$tmp"' 0
-trap 'exit 1' HUP INT TERM
-
-# Enumerate primary secret-key fingerprints and their UIDs.
-# Output: fingerprint|UID number|UID text
-gpg --batch --with-colons --fingerprint --list-secret-keys |
-awk -F: '
+identities=$(printf '%s\n' "$key_data" | awk -F: '
     $1 == "sec" {
-        in_key = 1
+        primary = 1
         fingerprint = ""
-        uid_number = 0
         next
     }
     $1 == "ssb" {
-        in_key = 0
+        primary = 0
         next
     }
-    in_key && $1 == "fpr" && fingerprint == "" {
+    primary && $1 == "fpr" && fingerprint == "" {
         fingerprint = $10
         next
     }
-    in_key && $1 == "uid" {
-        uid_number++
-        if (fingerprint != "")
-            printf "%s|%d|%s\n", fingerprint, uid_number, $10
+    primary && $1 == "uid" && fingerprint != "" {
+        print fingerprint "|" $10
     }
-' > "$tmp" || die "could not enumerate GPG keys"
+')
 
-[ -s "$tmp" ] || die "no secret-key user IDs found"
+[ -n "$identities" ] || die "no secret-key UIDs found"
 
-printf 'Available signing identities:\n\n'
-awk -F'|' '{
-    printf "%3d) %s\n     %s\n", NR, $1, $3
-}' "$tmp"
+printf 'Available GPG identities:\n\n'
+printf '%s\n' "$identities" | awk -F'|' '{
+    uid = $0
+    sub(/^[^|]*\|/, "", uid)
+    printf "%2d) %s\n    %s\n", NR, $1, uid
+}'
 
-printf '\nSelect the identity to use for BOTH signing and sign-off: '
+printf '\nSelect an identity: '
 IFS= read -r choice || die "no selection provided"
 
 case "$choice" in
     ''|*[!0-9]*) die "selection must be a number" ;;
 esac
 
-selected=$(awk -F'|' -v n="$choice" 'NR == n { print; exit }' "$tmp")
+selected=$(printf '%s\n' "$identities" |
+    awk -F'|' -v n="$choice" 'NR == n { print; exit }')
+
 [ -n "$selected" ] || die "invalid selection"
 
-fingerprint=$(printf '%s\n' "$selected" | cut -d'|' -f1)
-uid=$(printf '%s\n' "$selected" | cut -d'|' -f3-)
+fingerprint=${selected%%|*}
+uid=${selected#*|}
 
-# Extract the final <email> and the name preceding it.
-signoff_email=$(printf '%s\n' "$uid" |
+# Extract the name and email from the selected GPG UID.
+email=$(printf '%s\n' "$uid" |
     sed -n 's/.*<\([^<>]*\)>[[:space:]]*$/\1/p')
-signoff_name=$(printf '%s\n' "$uid" |
+
+name=$(printf '%s\n' "$uid" |
     sed 's/[[:space:]]*<[^<>]*>[[:space:]]*$//')
 
-[ -n "$signoff_name" ] ||
-    die "UID must contain a name and email: Name <email>"
-[ -n "$signoff_email" ] ||
-    die "UID must contain a name and email: Name <email>"
+[ -n "$name" ] && [ -n "$email" ] ||
+    die "GPG UID must have the format: Name <email>"
 
-printf '\nWill configure:\n'
-printf '  Author/committer: %s <%s>\n' "$github_name" "$github_email"
-printf '  Signing key:      %s\n' "$fingerprint"
-printf '  Sign-off:         %s <%s>\n' "$signoff_name" "$signoff_email"
-printf '\nApply to this repository? [y/N] '
-IFS= read -r answer || die "no confirmation provided"
+printf '\nRepository: %s\n' "$repo"
+printf 'Identity:  %s <%s>\n' "$name" "$email"
+printf 'GPG key:   %s\n' "$fingerprint"
+
+printf '\nConfigure this repository? [y/N] '
+IFS= read -r answer || die "could not read confirmation"
 
 case "$answer" in
     y|Y|yes|YES|Yes) ;;
     *) printf 'Cancelled.\n'; exit 0 ;;
 esac
 
-# Repository-local configuration only.
-git config --local user.name "$github_name"
-git config --local user.email "$github_email"
+# Git identity and signing configuration.
+git config --local user.name "$name"
+git config --local user.email "$email"
 git config --local user.useConfigOnly true
 git config --local user.signingkey "$fingerprint"
 git config --local commit.gpgsign true
 git config --local gpg.format openpgp
 
-# These custom values are derived from the selected GPG UID.
-git config --local signoff.name "$signoff_name"
-git config --local signoff.email "$signoff_email"
-git config --local signoff.key "$fingerprint"
+# Install the commit-msg hook.
+hook=$(git rev-parse --git-path hooks/commit-msg)
 
-mkdir -p "$(dirname "$hook")" ||
-    die "cannot create hooks directory"
+# Don't overwrite a hook we don't own.
+if [ -e "$hook" ] && ! grep -q '^# managed-by-gitsetup$' "$hook"; then
+    die "existing commit-msg hook will not be overwritten: $hook"
+fi
+
+mkdir -p "$(dirname "$hook")"
 
 cat > "$hook" <<'HOOK'
 #!/bin/sh
 # managed-by-gitsetup
 set -eu
 
-name=$(git config --local --get signoff.name) ||
-    { echo "commit-msg: missing signoff.name; rerun gitsetup" >&2; exit 1; }
-email=$(git config --local --get signoff.email) ||
-    { echo "commit-msg: missing signoff.email; rerun gitsetup" >&2; exit 1; }
-expected_key=$(git config --local --get signoff.key) ||
-    { echo "commit-msg: missing signoff.key; rerun gitsetup" >&2; exit 1; }
-actual_key=$(git config --local --get user.signingkey) ||
-    { echo "commit-msg: missing user.signingkey" >&2; exit 1; }
+name=$(git config --local --get user.name) ||
+    { echo "commit-msg: missing user.name" >&2; exit 1; }
 
-if [ "$actual_key" != "$expected_key" ]; then
-    echo -n "commit-msg: signing key differs from sign-off identity; "
-    ecoh    "rerun gitsetup" >&2
-    exit 1
-fi
+email=$(git config --local --get user.email) ||
+    { echo "commit-msg: missing user.email" >&2; exit 1; }
 
 git interpret-trailers \
     --in-place \
@@ -168,11 +128,8 @@ git interpret-trailers \
     "$1"
 HOOK
 
-chmod +x "$hook" || die "cannot make hook executable"
+chmod +x "$hook"
 
 printf '\nRepository configured successfully.\n'
-printf '  GitHub identity: %s <%s>\n' "$github_name" "$github_email"
-printf '  Sign-off:        %s <%s>\n' "$signoff_name" "$signoff_email"
-printf '\nUse ordinary Git commands, e.g.:\n'
-printf '  git commit -m "Fix container handling"\n'
-printf '  git log -1 --show-signature\n'
+printf '  Identity: %s <%s>\n' "$name" "$email"
+printf '  GPG key:  %s\n' "$fingerprint"
